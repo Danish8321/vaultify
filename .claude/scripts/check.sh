@@ -4,7 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 echo "==> restore (locked)"
-dotnet restore --locked-mode 2>/dev/null || dotnet restore
+# No fallback to an unlocked restore. Falling back would turn the one check that
+# catches an unexpected dependency change into a step that silently repairs it.
+dotnet restore --locked-mode
 
 echo "==> format (verify only)"
 dotnet format --verify-no-changes --no-restore

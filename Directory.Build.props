@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
+    <!-- Committed lockfiles. Without them a locked restore succeeds silently
+         and proves nothing, so CI would not actually be pinning anything and a
+         transitive version could change under us unnoticed. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
     <!-- check.sh is only meaningful if warnings can fail it. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

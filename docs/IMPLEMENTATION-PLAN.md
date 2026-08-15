@@ -10,7 +10,7 @@ Last updated 2026-08-15. A task is marked done only with the named script and it
 |---|---|---|
 | 0.1 Repo skeleton | done | `dotnet sln list` shows 8 projects |
 | 0.2 Verification scripts | done | `check.sh` exits 1 on an injected `CS0029`; all scripts exit 0 otherwise |
-| 0.3 CI pipeline | not started | — |
+| 0.3 CI pipeline | done | `ci.yml` runs all four gates; locked restore made real by committed lockfiles (NU1004-verified) |
 | 1.1–1.3, 1.5 Azure infra | **deferred** | skipped by decision to reach a working slice first; nothing is deployed |
 | 1.4 B2C token validation | partial | validation code and its tests are done and real; the B2C tenant itself is not provisioned |
 | 2.1 Item schema | done | `InitialItemSchema` migration read and corrected before applying |
@@ -56,9 +56,15 @@ Nothing here is a feature. It exists so that "done" means something for every ta
 - **Verify:** Each script runs against the empty solution and exits 0. Deliberately break the build; confirm `check.sh` exits non-zero. A script that cannot fail is not a check.
 
 ### 0.3 CI pipeline
-- **Files:** `.github/workflows/ci.yml`
-- **Change:** On PR — restore with a frozen lockfile, run `check.sh`, `test-fast.sh`, `contract.sh`. No dependency install scripts run unreviewed.
+- **Files:** `.github/workflows/ci.yml`, `Directory.Build.props`, `**/packages.lock.json`
+- **Change:** On PR — restore with a frozen lockfile, run `check.sh`, `test-fast.sh`, `contract.sh`, `test-full.sh`. No dependency install scripts run unreviewed.
 - **Verify:** Pipeline green on an empty solution; a PR with a formatting violation goes red.
+- **As built:** "Frozen lockfile" required `RestorePackagesWithLockFile` first — without committed
+  lockfiles `--locked-mode` succeeds silently and pins nothing. Proven by mutating a central
+  package pin and getting NU1004. `check.sh`'s `|| dotnet restore` fallback was removed for the
+  same reason: it would have repaired the mismatch instead of reporting it. Install-script review
+  has no NuGet analogue and is deferred to task 2.9, when Gradle — which does execute arbitrary
+  build code — enters CI.
 
 ---
 

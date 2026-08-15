@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Cryptum.Api/Cryptum.Api.csproj" />
+    <Project Path="src/Cryptum.Data/Cryptum.Data.csproj" />
+    <Project Path="src/Cryptum.Domain/Cryptum.Domain.csproj" />
+    <Project Path="src/Cryptum.Infrastructure/Cryptum.Infrastructure.csproj" />
+    <Project Path="src/Cryptum.Worker/Cryptum.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Cryptum.IntegrationTests/Cryptum.IntegrationTests.csproj" />
+    <Project Path="tests/Cryptum.UnitTests/Cryptum.UnitTests.csproj" />
+  </Folder>
+</Solution>

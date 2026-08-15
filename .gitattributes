@@ -1,0 +1,15 @@
+* text=auto
+
+# Shell scripts must stay LF. CRLF here fails on Linux CI with
+# "bad interpreter: /bin/bash^M" — and the verification scripts are the
+# one thing that must never be silently broken.
+*.sh text eol=lf
+gradlew text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jks binary
+*.keystore binary

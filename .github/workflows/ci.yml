@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Dependency install scripts are never run unreviewed, and the committed
+      # lockfile is authoritative — a restore that needs to change it fails here.
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+        env:
+          NUGET_XMLDOC_MODE: skip
+
+      - name: Check (build, format, analyzers)
+        run: bash .claude/scripts/check.sh
+
+      - name: Unit tests
+        run: bash .claude/scripts/test-fast.sh
+
+      - name: Contract drift
+        run: bash .claude/scripts/contract.sh
+
+      # NuGet audit is already wired into the build via TreatWarningsAsErrors,
+      # so a vulnerable transitive package fails `check.sh` above. This step
+      # reports the detail rather than being the gate itself.
+      - name: Vulnerability report
+        if: always()
+        run: dotnet list package --vulnerable --include-transitive

@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
 
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
@@ -11,6 +11,9 @@
     <!-- Transitive pin: Microsoft.AspNetCore.OpenApi 10.0.10 pulls Microsoft.OpenApi 2.0.0,
          which carries GHSA-v5pm-xwqc-g5wc (high). Pinned forward, not suppressed. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
+    <!-- Build-time only (PrivateAssets=all): emits openapi.json during build so
+         contract.sh can diff it. No runtime surface. -->
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup Label="Auth">

@@ -48,6 +48,18 @@ public sealed record CreateSecretRequest
     public const int MaxDekBytes = 32;
 }
 
+/// <summary>
+/// The id of a newly created Item.
+/// </summary>
+/// <remarks>
+/// A named type rather than an anonymous object: the Android client is generated
+/// from this contract, and an anonymous shape would generate nothing.
+/// </remarks>
+public sealed record CreatedItemResponse
+{
+    public required Guid Id { get; init; }
+}
+
 /// <summary>An Item as returned for reading: ciphertext plus the unwrapped DEK to decrypt it.</summary>
 public sealed record ItemResponse
 {

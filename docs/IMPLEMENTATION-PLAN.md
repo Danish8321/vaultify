@@ -17,13 +17,13 @@ Last updated 2026-08-15. A task is marked done only with the named script and it
 | 2.2 Owner-scoped data access | done | IDOR tests pass; removing the owner predicate makes them fail |
 | 2.3 `IKeyWrapper` seam | done | 27 unit tests, incl. cross-user unwrap and shred permanence |
 | 2.4 KEK provisioning on signup | not started | — |
-| 2.5 API contract | partial | contracts written; `openapi.json` not generated, so `contract.sh` is still a no-op |
+| 2.5 API contract | done (server side) | `contract.sh` exits 1 on an injected contract change and 0 when reverted; client generation lands with 2.11 |
 | 2.6 Item endpoints | done | 8 integration tests against the real JWT handler |
 | 2.7 Audit log | partial | domain, mapping and migration done; the INSERT-only DB principal needs a database, so the tamper test is blocked on Phase 1 |
 | 2.8 Rate limiting | partial | buckets wired; the 429 separation test is not written |
 | 2.9–2.14 Android and e2e | not started | — |
 
-Two gaps are worth naming because they weaken later claims until closed. `contract.sh` passing currently proves nothing (2.5), and no test yet demonstrates that the audit trail resists deletion by the application (2.7).
+One gap is worth naming because it weakens a later claim until closed: no test yet demonstrates that the audit trail resists deletion by the application (2.7), and that needs a real database.
 
 ## Sequencing principle
 
@@ -122,6 +122,7 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Files:** `src/Cryptum.Api/Contracts/`, generated `openapi.json`
 - **Change:** `POST /items` (title, ciphertext, nonce, plaintext DEK to wrap), `GET /items` (list — titles only), `GET /items/{id}` (ciphertext, nonce, unwrapped DEK). Validate at the boundary: title length, ciphertext size cap, nonce exactly 96 bits. The contract is the source of truth; the Android client is generated from it, never hand-written to match (repo invariant).
 - **Verify:** `contract.sh` passes. Malformed input returns 422 with no internal detail.
+- **As built:** `openapi.json` is generated at build time by `Microsoft.Extensions.ApiDescription.Server` and **committed**, so `contract.sh` diffs the regenerated spec against the committed one. Three ways it now fails that it could not before: a missing spec, an untracked spec (which would make the diff vacuously succeed), and a spec carrying `example`/`default` values, since a DEK-shaped example would publish key-shaped material in a committed artifact. The build runs `--no-incremental` because an up-to-date build skips document generation, and a stale spec would pass the diff while proving nothing. Validation failures return 400 rather than the planned 422 — the framework's `ValidationProblem` default, and not worth diverging from.
 
 ### 2.6 Item endpoints
 - **Files:** `src/Cryptum.Api/Endpoints/ItemEndpoints.cs`, `src/Cryptum.Api/Auth/CallerIdentity.cs`, `src/Cryptum.Domain/VaultService.cs`

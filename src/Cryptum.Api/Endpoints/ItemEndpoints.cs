@@ -16,14 +16,28 @@ public static class ItemEndpoints
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var group = app.MapGroup("/items").RequireAuthorization();
+        var group = app.MapGroup("/items")
+            .RequireAuthorization()
+            .WithTags("Items")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
-        group.MapPost("/", CreateSecretAsync);
-        group.MapGet("/", ListAsync);
+        group.MapPost("/", CreateSecretAsync)
+            .WithName("CreateSecret")
+            .Produces<CreatedItemResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem();
+
+        group.MapGet("/", ListAsync)
+            .WithName("ListItems")
+            .Produces<IReadOnlyList<ItemSummaryResponse>>();
 
         // Stricter bucket than general CRUD: each call unwraps one DEK, so this
         // is the route worth abusing (docs/security-requirements.md).
-        group.MapGet("/{id:guid}", ReadAsync).RequireRateLimiting(UnwrapPolicy);
+        group.MapGet("/{id:guid}", ReadAsync)
+            .WithName("ReadItem")
+            .Produces<ItemResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireRateLimiting(UnwrapPolicy);
 
         return app;
     }
@@ -57,7 +71,9 @@ public static class ItemEndpoints
             owner, request.Title, request.Ciphertext, request.Nonce, request.Dek, cancellationToken)
             .ConfigureAwait(false);
 
-        return Results.Created($"/items/{item.Id.Value}", new { id = item.Id.Value });
+        return Results.Created(
+            $"/items/{item.Id.Value}",
+            new CreatedItemResponse { Id = item.Id.Value });
     }
 
     private static async Task<IResult> ReadAsync(

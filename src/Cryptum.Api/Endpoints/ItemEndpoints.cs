@@ -39,6 +39,30 @@ public static class ItemEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .RequireRateLimiting(UnwrapPolicy);
 
+        group.MapPut("/{id:guid}", UpdateSecretAsync)
+            .WithName("UpdateSecret")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
+        group.MapGet("/{id:guid}/versions", ListVersionsAsync)
+            .WithName("ListItemVersions")
+            .Produces<IReadOnlyList<ItemVersionSummaryResponse>>();
+
+        // Unwraps a DEK, so it shares the stricter bucket with reading an Item.
+        group.MapGet("/{id:guid}/versions/{versionNumber:int}", ReadVersionAsync)
+            .WithName("ReadItemVersion")
+            .Produces<ItemVersionResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireRateLimiting(UnwrapPolicy);
+
+        // POST, not PUT: a restore is not idempotent — each call archives the
+        // content it displaces, so replaying one is a further edit, not a no-op.
+        group.MapPost("/{id:guid}/versions/{versionNumber:int}/restore", RestoreVersionAsync)
+            .WithName("RestoreItemVersion")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -112,6 +136,113 @@ public static class ItemEndpoints
                 UpdatedAt = item.UpdatedAt,
             });
         }
+    }
+
+    private static async Task<IResult> UpdateSecretAsync(
+        Guid id,
+        [FromBody] UpdateSecretRequest request,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (request.Nonce.Length != Item.NonceLength
+            || request.Dek.Length != CreateSecretRequest.MinDekBytes
+            || request.Ciphertext.Length > CreateSecretRequest.MaxCiphertextBytes
+            || string.IsNullOrWhiteSpace(request.Title)
+            || request.Title.Length > Item.MaxTitleLength)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["request"] = ["Invalid request."],
+            });
+        }
+
+        var updated = await vault.UpdateSecretAsync(
+            owner, new ItemId(id), request.Title, request.Ciphertext, request.Nonce, request.Dek, cancellationToken)
+            .ConfigureAwait(false);
+
+        // 404 for a non-owned Item, as on the read path: 403 would confirm the id exists.
+        return updated ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> ListVersionsAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        var versions = await vault.ListVersionsAsync(owner, new ItemId(id), cancellationToken).ConfigureAwait(false);
+
+        // An empty list for an Item that is not the caller's, same as for one with
+        // no history — consistent with 404-not-403 elsewhere.
+        return Results.Ok(versions.Select(v => new ItemVersionSummaryResponse
+        {
+            VersionNumber = v.VersionNumber,
+            ArchivedAt = v.ArchivedAt,
+        }));
+    }
+
+    private static async Task<IResult> ReadVersionAsync(
+        Guid id,
+        int versionNumber,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result = await vault.ReadVersionAsync(owner, new ItemId(id), versionNumber, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        var (version, dek) = result.Value;
+
+        using (dek)
+        {
+            return Results.Ok(new ItemVersionResponse
+            {
+                VersionNumber = version.VersionNumber,
+                Ciphertext = version.Ciphertext,
+                Nonce = version.Nonce,
+                Dek = dek.Span.ToArray(),
+                ArchivedAt = version.ArchivedAt,
+            });
+        }
+    }
+
+    private static async Task<IResult> RestoreVersionAsync(
+        Guid id,
+        int versionNumber,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        var restored = await vault.RestoreVersionAsync(owner, new ItemId(id), versionNumber, cancellationToken)
+            .ConfigureAwait(false);
+
+        return restored ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> ListAsync(

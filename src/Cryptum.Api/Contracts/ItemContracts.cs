@@ -96,3 +96,70 @@ public sealed record ItemSummaryResponse
 
     public required DateTimeOffset UpdatedAt { get; init; }
 }
+
+/// <summary>
+/// Replace a Secret's content. Same shape as <see cref="CreateSecretRequest"/>
+/// because an edit is a fresh encryption, not a patch.
+/// </summary>
+/// <remarks>
+/// A partial update is deliberately not offered. The server cannot read the
+/// fields inside the ciphertext, so it could not merge them — the client must
+/// re-encrypt the whole secret under a fresh DEK and nonce (ADR-0006). No owner
+/// field, and no version field: ownership and numbering are both server-decided.
+/// </remarks>
+public sealed record UpdateSecretRequest
+{
+    [Required]
+    [StringLength(Item.MaxTitleLength, MinimumLength = 1)]
+    public required string Title { get; init; }
+
+    [Required]
+    [MaxLength(CreateSecretRequest.MaxCiphertextBytes)]
+    public required byte[] Ciphertext { get; init; }
+
+    [Required]
+    [MinLength(Item.NonceLength)]
+    [MaxLength(Item.NonceLength)]
+    public required byte[] Nonce { get; init; }
+
+    [Required]
+    [MinLength(CreateSecretRequest.MinDekBytes)]
+    [MaxLength(CreateSecretRequest.MaxDekBytes)]
+    public required byte[] Dek { get; init; }
+}
+
+/// <summary>
+/// One entry in an Item's history list. Metadata only.
+/// </summary>
+/// <remarks>
+/// No ciphertext and no DEK: a history list is a per-Item enumeration, so
+/// carrying content here would turn one request into a bulk download of every
+/// revision. Reading a version is a separate, rate-limited call.
+/// </remarks>
+public sealed record ItemVersionSummaryResponse
+{
+    public required int VersionNumber { get; init; }
+
+    public required DateTimeOffset ArchivedAt { get; init; }
+}
+
+/// <summary>An archived version, with the DEK it was encrypted under.</summary>
+public sealed record ItemVersionResponse
+{
+    public required int VersionNumber { get; init; }
+
+    public required byte[] Ciphertext { get; init; }
+
+    public required byte[] Nonce { get; init; }
+
+    /// <summary>
+    /// The version's own unwrapped DEK — not the Item's current one.
+    /// </summary>
+    /// <remarks>
+    /// Same exposure as <see cref="ItemResponse.Dek"/> and the same rule: never
+    /// logged. Each version keeps its own DEK, so restoring never re-encrypts.
+    /// </remarks>
+    public required byte[] Dek { get; init; }
+
+    public required DateTimeOffset ArchivedAt { get; init; }
+}

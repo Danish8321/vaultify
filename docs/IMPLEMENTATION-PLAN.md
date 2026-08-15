@@ -21,7 +21,8 @@ Last updated 2026-08-15. A task is marked done only with the named script and it
 | 2.6 Item endpoints | done | 8 integration tests against the real JWT handler |
 | 2.7 Audit log | partial | domain, mapping and migration done; the INSERT-only DB principal needs a database, so the tamper test is blocked on Phase 1 |
 | 2.8 Rate limiting | done | unwrap budget exhausts at 20 while CRUD still serves 200; fails if the buckets are equalised |
-| 2.9–2.14 Android and e2e | not started | — |
+| 2.9–2.14 Android and e2e | blocked | no Gradle on this machine and no wrapper to bootstrap from (ticket 10) |
+| 3.0 Item version history | done (server side) | 16 unit + 5 integration tests; restore proven by decrypting, not by comparing bytes; migration reviewed, not applied |
 
 One gap is worth naming because it weakens a later claim until closed: no test yet demonstrates that the audit trail resists deletion by the application (2.7), and that needs a real database.
 
@@ -189,6 +190,19 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Change:** On edit, retain the prior ciphertext, nonce and wrapped DEK as a version row against the stable Item id, instead of replacing them (ADR-0006). Each version keeps its own DEK, so restoring one needs no re-encryption. Cap retained versions per Item so history cannot grow without bound.
 - **Verify:** Test — edit an Item twice, restore version 1, confirm the original plaintext returns. Confirm cross-user access to a version is refused, same as for Items: history must not become an IDOR bypass around the Item-level check.
 - **Why first:** MVP ships with unrecoverable overwrite. This closes a real data-loss gap and is the reason Phase 3 leads with it rather than with Files.
+- **As built:** Retention capped at `ItemVersion.MaxRetained` = 10. `Item.ReplaceContent` now
+  *returns* the version it displaced, so silently overwriting the only copy is no longer
+  expressible at that seam. History carries the Item table's guarantees rather than inheriting
+  them: `Owner` is denormalised onto the row so the predicate lives inside the query, the key is
+  composite `(ItemId, VersionNumber)` so there is no surrogate id to fetch by alone, and
+  `SoftDeleteAllAsync` covers history in the same call. A restore is itself an edit — it archives
+  what it displaces, so restoring the wrong version is undoable, which matters because the user
+  cannot read any version before choosing one.
+  <br>The plan scoped this to domain and data; four routes (`PUT /items/{id}`,
+  `GET .../versions`, `GET .../versions/{n}`, `POST .../versions/{n}/restore`) were added too,
+  since without them nothing above is reachable. Version reads share the unwrap rate-limit bucket.
+  <br>The migration is reviewed but **not applied**: purely additive, and there is no database
+  until Phase 1 (ticket 06). The Android half of the slice is blocked on ticket 10.
 
 ### 3.1 Blob storage path
 - **Files:** `src/Cryptum.Infrastructure/BlobStore.cs`, `ItemsController`

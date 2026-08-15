@@ -46,9 +46,65 @@ public sealed class ItemRepository(CryptumDbContext db) : IItemRepository
     // the semantics wanted here: re-running account deletion must not rewrite the
     // original DeletedAt stamp that the purge job schedules from. So no
     // IgnoreQueryFilters().
-    public async Task<int> SoftDeleteAllAsync(UserId owner, DateTimeOffset now, CancellationToken cancellationToken = default) =>
-        await db.Items
+    public async Task<int> SoftDeleteAllAsync(UserId owner, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        // History is soft-deleted in the same call rather than in a separate one
+        // the caller has to remember. The KEK is already destroyed by this point,
+        // so these rows are unreadable either way — but leaving them visible would
+        // still expose edit timestamps and revision counts.
+        await db.ItemVersions
+            .Where(v => v.Owner == owner)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.DeletedAt, now), cancellationToken)
+            .ConfigureAwait(false);
+
+        // The Item count is what is returned: it is the count callers reason
+        // about, and it stays stable as retention policy changes the version count.
+        return await db.Items
             .Where(i => i.Owner == owner)
             .ExecuteUpdateAsync(s => s.SetProperty(i => i.DeletedAt, now), cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task AddVersionAsync(ItemVersion version, CancellationToken cancellationToken = default) =>
+        await db.ItemVersions.AddAsync(version, cancellationToken).ConfigureAwait(false);
+
+    public async Task<ItemVersion?> FindVersionAsync(
+        UserId owner, ItemId id, int versionNumber, CancellationToken cancellationToken = default) =>
+        await db.ItemVersions
+            .Where(v => v.Owner == owner && v.ItemId == id && v.VersionNumber == versionNumber)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<ItemVersionSummary>> ListVersionsAsync(
+        UserId owner, ItemId id, CancellationToken cancellationToken = default)
+    {
+        List<ItemVersionSummary> summaries = await db.ItemVersions
+            .Where(v => v.Owner == owner && v.ItemId == id)
+            .OrderByDescending(v => v.VersionNumber)
+            .Select(v => new ItemVersionSummary(v.VersionNumber, v.ArchivedAt))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return summaries;
+    }
+
+    public async Task<int> PruneVersionsAsync(
+        UserId owner, ItemId id, CancellationToken cancellationToken = default)
+    {
+        // Hard delete, not soft: a pruned version is unreachable by policy, and
+        // keeping the row would leave ciphertext the user believes is gone.
+        // Selecting the survivors and deleting the complement — rather than
+        // "delete where VersionNumber <= max - MaxRetained" — keeps this correct
+        // when numbering has gaps from an earlier prune.
+        var keep = db.ItemVersions
+            .Where(v => v.Owner == owner && v.ItemId == id)
+            .OrderByDescending(v => v.VersionNumber)
+            .Take(ItemVersion.MaxRetained)
+            .Select(v => v.VersionNumber);
+
+        return await db.ItemVersions
+            .Where(v => v.Owner == owner && v.ItemId == id && !keep.Contains(v.VersionNumber))
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

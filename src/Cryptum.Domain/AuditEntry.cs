@@ -10,6 +10,11 @@ public enum AuditAction
     DekUnwrapped = 5,
     AccountCryptoShredded = 6,
     AccessDenied = 7,
+    ItemUpdated = 8,
+    ItemVersionRead = 9,
+
+    /// <summary>A restore rewrites current content, so it is a write worth naming separately.</summary>
+    ItemVersionRestored = 10,
 }
 
 /// <summary>

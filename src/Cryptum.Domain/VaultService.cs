@@ -74,6 +74,143 @@ public sealed class VaultService(
         return (item, dek);
     }
 
+    /// <summary>
+    /// Replaces a Secret's content, archiving what it displaced. Returns false if
+    /// the caller does not own the Item — the same answer a missing Item gives.
+    /// </summary>
+    public async Task<bool> UpdateSecretAsync(
+        UserId owner,
+        ItemId id,
+        string title,
+        byte[] ciphertext,
+        byte[] nonce,
+        ReadOnlyMemory<byte> dek,
+        CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var item = await items.FindAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        if (item is null)
+        {
+            await auditLog.RecordAsync(
+                AuditEntry.Record(owner, AuditAction.AccessDenied, now, id, succeeded: false),
+                cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        var wrapped = await keyWrapper.WrapAsync(owner, dek, cancellationToken).ConfigureAwait(false);
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.DekWrapped, now), cancellationToken).ConfigureAwait(false);
+
+        await items.AddVersionAsync(
+            item.ReplaceContent(title, ciphertext, nonce, wrapped, now), cancellationToken).ConfigureAwait(false);
+        await items.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Pruned after the write, so a prune failure cannot cost the user the
+        // edit itself. Excess history is a retention problem, not a data-loss one.
+        await items.PruneVersionsAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemUpdated, now, id), cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Makes an archived version current again. Returns false if the caller does
+    /// not own the Item, or if that version is not retained.
+    /// </summary>
+    /// <remarks>
+    /// A restore is an edit, not a rewind: the content it displaces is archived
+    /// in turn. Restoring the wrong version is therefore itself undoable, which
+    /// matters because the user choosing a version cannot read any of them until
+    /// after the fact.
+    ///
+    /// <para>
+    /// The version's own wrapped DEK is reused rather than re-wrapped, so the
+    /// server never handles this content's plaintext — the whole point of
+    /// per-version DEKs (ADR-0006).
+    /// </para>
+    /// </remarks>
+    public async Task<bool> RestoreVersionAsync(
+        UserId owner,
+        ItemId id,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+
+        var item = await items.FindAsync(owner, id, cancellationToken).ConfigureAwait(false);
+        var version = await items.FindVersionAsync(owner, id, versionNumber, cancellationToken).ConfigureAwait(false);
+
+        if (item is null || version is null)
+        {
+            await auditLog.RecordAsync(
+                AuditEntry.Record(owner, AuditAction.AccessDenied, now, id, succeeded: false),
+                cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        await items.AddVersionAsync(
+            item.ReplaceContent(
+                item.Title,
+                version.Ciphertext,
+                version.Nonce,
+                new WrappedDek(version.WrappedDek, version.KekVersion),
+                now),
+            cancellationToken).ConfigureAwait(false);
+        await items.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await items.PruneVersionsAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemVersionRestored, now, id), cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>Returns an archived version and its unwrapped DEK, or null if not the caller's.</summary>
+    public async Task<(ItemVersion Version, PlaintextDek Dek)?> ReadVersionAsync(
+        UserId owner,
+        ItemId id,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var version = await items.FindVersionAsync(owner, id, versionNumber, cancellationToken).ConfigureAwait(false);
+
+        if (version is null)
+        {
+            await auditLog.RecordAsync(
+                AuditEntry.Record(owner, AuditAction.AccessDenied, now, id, succeeded: false),
+                cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
+        var dek = await keyWrapper.UnwrapAsync(
+            owner, new WrappedDek(version.WrappedDek, version.KekVersion), cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.DekUnwrapped, now, id), cancellationToken).ConfigureAwait(false);
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemVersionRead, now, id), cancellationToken).ConfigureAwait(false);
+
+        return (version, dek);
+    }
+
+    public async Task<IReadOnlyList<ItemVersionSummary>> ListVersionsAsync(
+        UserId owner,
+        ItemId id,
+        CancellationToken cancellationToken = default)
+    {
+        var summaries = await items.ListVersionsAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemListed, clock.GetUtcNow(), id), cancellationToken).ConfigureAwait(false);
+
+        return summaries;
+    }
+
     public async Task<IReadOnlyList<ItemSummary>> ListAsync(
         UserId owner,
         CancellationToken cancellationToken = default)

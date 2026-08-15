@@ -22,9 +22,28 @@ public interface IItemRepository
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Soft-deletes every Item owned by the User (ADR-0003).</summary>
+    /// <summary>Soft-deletes every Item owned by the User, history included (ADR-0003).</summary>
     Task<int> SoftDeleteAllAsync(UserId owner, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    Task AddVersionAsync(ItemVersion version, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the archived version only if <paramref name="owner"/> owns it; otherwise null.</summary>
+    Task<ItemVersion?> FindVersionAsync(
+        UserId owner, ItemId id, int versionNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>Version metadata only — no ciphertext, no wrapped DEKs.</summary>
+    Task<IReadOnlyList<ItemVersionSummary>> ListVersionsAsync(
+        UserId owner, ItemId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Drops all but the newest <see cref="ItemVersion.MaxRetained"/> versions of an Item,
+    /// so history cannot grow without bound. Returns the number removed.
+    /// </summary>
+    Task<int> PruneVersionsAsync(UserId owner, ItemId id, CancellationToken cancellationToken = default);
 }
 
 /// <summary>List-view projection. Carries no secret material by construction.</summary>
 public sealed record ItemSummary(ItemId Id, ItemKind Kind, string Title, DateTimeOffset UpdatedAt);
+
+/// <summary>History list-view projection. Carries no secret material by construction.</summary>
+public sealed record ItemVersionSummary(int VersionNumber, DateTimeOffset ArchivedAt);

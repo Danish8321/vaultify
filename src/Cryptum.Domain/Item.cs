@@ -123,14 +123,28 @@ public sealed class Item
     }
 
     /// <summary>
-    /// Replaces content in place under a freshly generated DEK and nonce (ADR-0006).
+    /// Number of versions this Item has ever archived. The next version's number,
+    /// not the number currently retained — pruning must not renumber history.
+    /// </summary>
+    public int VersionCount { get; private set; }
+
+    /// <summary>
+    /// Replaces content under a freshly generated DEK and nonce, returning the
+    /// content it displaced as an archived version (ADR-0006).
     /// </summary>
     /// <remarks>
     /// Requiring a new DEK on every write is what makes AES-GCM nonce reuse
     /// structurally impossible rather than merely unlikely: no DEK ever encrypts
     /// more than one message.
+    ///
+    /// <para>
+    /// The archive is returned rather than held in a collection on the Item so
+    /// the caller cannot edit without dealing with the displaced content: the
+    /// old MVP behaviour, silently overwriting the only copy, is no longer
+    /// expressible at this seam.
+    /// </para>
     /// </remarks>
-    public void ReplaceContent(
+    public ItemVersion ReplaceContent(
         string title,
         byte[] ciphertext,
         byte[] nonce,
@@ -141,12 +155,17 @@ public sealed class Item
         ValidateNonce(nonce);
         ArgumentNullException.ThrowIfNull(ciphertext);
 
+        // Archived before any field is touched — it captures the outgoing state.
+        var archived = ItemVersion.Archive(this, ++VersionCount, now);
+
         Title = title;
         Ciphertext = ciphertext;
         Nonce = nonce;
         WrappedDek = wrappedDek.Value;
         KekVersion = wrappedDek.KekVersion;
         UpdatedAt = now;
+
+        return archived;
     }
 
     public void MarkDeleted(DateTimeOffset now) => DeletedAt = now;

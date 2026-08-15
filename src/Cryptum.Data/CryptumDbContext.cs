@@ -18,6 +18,8 @@ public sealed class CryptumDbContext(DbContextOptions<CryptumDbContext> options)
 {
     public DbSet<Item> Items => Set<Item>();
 
+    public DbSet<ItemVersion> ItemVersions => Set<ItemVersion>();
+
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     public DbSet<User> Users => Set<User>();
@@ -26,6 +28,7 @@ public sealed class CryptumDbContext(DbContextOptions<CryptumDbContext> options)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfiguration(new ItemConfiguration());
+        modelBuilder.ApplyConfiguration(new ItemVersionConfiguration());
         modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
 

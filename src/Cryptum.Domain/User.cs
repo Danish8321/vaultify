@@ -43,4 +43,15 @@ public interface IUserRepository
     /// it lost rather than fail.
     /// </remarks>
     Task<bool> AddIfAbsentAsync(User user, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the User row, if present. Reports whether it removed one.
+    /// </summary>
+    /// <remarks>
+    /// A hard delete, unlike Items. The row exists only to record that a KEK was
+    /// provisioned; once the KEK is shredded the row is a lie, and leaving it
+    /// behind makes provisioning skip a User who has no key — which surfaces as
+    /// a 500 on their next write rather than as anything diagnosable.
+    /// </remarks>
+    Task<bool> RemoveAsync(UserId id, CancellationToken cancellationToken = default);
 }

@@ -29,4 +29,11 @@ public sealed class UserRepository(CryptumDbContext db) : IUserRepository
             return false;
         }
     }
+
+    public async Task<bool> RemoveAsync(UserId id, CancellationToken cancellationToken = default) =>
+        await db.Users
+            .Where(u => u.Id == id)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false) > 0;
+
 }

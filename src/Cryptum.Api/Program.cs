@@ -84,6 +84,7 @@ app.UseMiddleware<UserProvisioningMiddleware>();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapItemEndpoints();
+app.MapAccountEndpoints();
 
 await app.RunAsync();
 

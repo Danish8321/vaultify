@@ -439,6 +439,39 @@
           }
         }
       }
+    },
+    "/account": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "DeleteAccount",
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -732,6 +765,9 @@
     },
     {
       "name": "Items"
+    },
+    {
+      "name": "Account"
     }
   ]
 }

@@ -13,6 +13,7 @@ public sealed class VaultService(
     IItemRepository items,
     IKeyWrapper keyWrapper,
     IAuditLog auditLog,
+    IUserRepository users,
     TimeProvider clock)
 {
     public async Task<Item> CreateSecretAsync(
@@ -240,5 +241,12 @@ public sealed class VaultService(
             AuditEntry.Record(owner, AuditAction.AccountCryptoShredded, now), cancellationToken).ConfigureAwait(false);
 
         await items.SoftDeleteAllAsync(owner, now, cancellationToken).ConfigureAwait(false);
+
+        // Last. The User row is the record that a KEK exists, so it must not
+        // outlive the KEK: provisioning skips a User who has a row, and that
+        // User would then have no key — a 500 on their next write. Removing it
+        // lets the same identity start a fresh Vault, which recovers nothing:
+        // the new KEK cannot unwrap a single DEK the old one wrapped.
+        await users.RemoveAsync(owner, cancellationToken).ConfigureAwait(false);
     }
 }

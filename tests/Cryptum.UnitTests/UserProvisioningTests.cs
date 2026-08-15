@@ -104,5 +104,8 @@ public sealed class UserProvisioningTests
 
         public Task<bool> AddIfAbsentAsync(User user, CancellationToken cancellationToken = default) =>
             inner.AddIfAbsentAsync(user, cancellationToken);
+
+        public Task<bool> RemoveAsync(UserId id, CancellationToken cancellationToken = default) =>
+            inner.RemoveAsync(id, cancellationToken);
     }
 }

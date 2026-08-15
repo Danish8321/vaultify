@@ -23,6 +23,7 @@ Last updated 2026-08-15. A task is marked done only with the named script and it
 | 2.8 Rate limiting | done | unwrap budget exhausts at 20 while CRUD still serves 200; fails if the buckets are equalised |
 | 2.9–2.14 Android and e2e | blocked | no Gradle on this machine and no wrapper to bootstrap from (ticket 10) |
 | 3.0 Item version history | done (server side) | 16 unit + 5 integration tests; restore proven by decrypting, not by comparing bytes; migration reviewed, not applied |
+| 4.1 Crypto-shred deletion | done (server side) | 6 unit + 5 integration tests; surviving ciphertext proven unusable, not merely hidden |
 
 One gap is worth naming because it weakens a later claim until closed: no test yet demonstrates that the audit trail resists deletion by the application (2.7), and that needs a real database.
 
@@ -227,6 +228,12 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Files:** `src/Cryptum.Domain/AccountDeletion.cs`
 - **Change:** Delete the KEK, soft-delete rows, then purge rows and blobs asynchronously (ADR-0003).
 - **Verify:** Test — after deletion, unwrap fails and Items are undecryptable even though ciphertext still exists. That is precisely what crypto-shred claims, so it is what the test must assert.
+- **As built:** The use case already lived on `VaultService.DeleteAccountAsync`, so no separate
+  `AccountDeletion.cs` was added — a second entry point to an irreversible operation is a liability,
+  not an organisational improvement. Added `DELETE /account` (no id in the route: the account
+  deleted is always the caller's) under the unwrap rate-limit bucket, and made deletion also remove
+  the `Users` row, which fixed a 500 on the next write after deletion (ticket 11). The async purge
+  of soft-deleted rows remains 4.2 and needs a database.
 
 ### 4.2 Async purge worker
 - **Files:** `src/Cryptum.Worker/`

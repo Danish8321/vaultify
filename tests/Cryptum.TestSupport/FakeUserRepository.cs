@@ -25,4 +25,8 @@ public sealed class FakeUserRepository : IUserRepository
         ArgumentNullException.ThrowIfNull(user);
         return Task.FromResult(users.TryAdd(user.Id, user));
     }
+
+    public Task<bool> RemoveAsync(UserId id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(users.TryRemove(id, out _));
+
 }

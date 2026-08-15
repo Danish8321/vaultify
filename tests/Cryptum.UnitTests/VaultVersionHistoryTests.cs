@@ -40,7 +40,7 @@ public sealed class VaultVersionHistoryTests : IDisposable
             new DbContextOptionsBuilder<CryptumDbContext>().UseSqlite(connection).Options);
         db.Database.EnsureCreated();
 
-        vault = new VaultService(new ItemRepository(db), keyWrapper, new AuditLog(db), clock);
+        vault = new VaultService(new ItemRepository(db), keyWrapper, new AuditLog(db), new UserRepository(db), clock);
 
         // Production provisions on the first authenticated request, via
         // UserProvisioningMiddleware. Neither user gets a KEK for free here —

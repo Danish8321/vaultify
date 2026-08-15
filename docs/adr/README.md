@@ -8,6 +8,7 @@
 | [0004](./0004-azure-ad-b2c-for-user-identity.md) | Azure AD B2C for user identity | accepted |
 | [0005](./0005-no-kek-rotation-in-mvp.md) | No KEK rotation in MVP | accepted |
 | [0006](./0006-overwrite-on-edit-version-history-deferred.md) | Edits overwrite in place with a fresh DEK; version history deferred | accepted |
+| [0007](./0007-no-certificate-pinning-in-mvp.md) | No certificate pinning in the Android client for MVP | accepted |
 
 ADRs 0001, 0002 and 0004 are entangled: they are three views of the same choice to let the service mediate key access rather than derive keys from a user secret. Revisiting any one of them means revisiting all three.
 

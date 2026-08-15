@@ -43,7 +43,7 @@ Nothing here is a feature. It exists so that "done" means something for every ta
 
 ### 1.1 Bicep for core resources
 - **Files:** `infra/main.bicep`, `infra/modules/*.bicep`
-- **Change:** App Service (Linux, .NET), Azure SQL, Storage account with a private container, Key Vault (standard, soft-delete on, RBAC authorization), App Insights, Log Analytics. App Service gets a **system-assigned** Managed Identity — no client secrets anywhere (security-requirements).
+- **Change:** App Service (Linux, .NET), Azure SQL, Storage account with a private container, Key Vault (standard, RBAC authorization, **soft-delete retention set explicitly to 7 days, purge protection disabled** per ADR-0003), App Insights, Log Analytics. App Service gets a **system-assigned** Managed Identity — no client secrets anywhere (security-requirements).
 - **Verify:** `az deployment group what-if` succeeds against a dev resource group and shows exactly the intended resource set.
 
 ### 1.2 Key Vault access policy, least privilege
@@ -146,7 +146,13 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 
 ---
 
-## Phase 3 — Files
+## Phase 3 — Version history, then Files
+
+### 3.0 Item version history
+- **Files:** `src/Cryptum.Domain/ItemVersion.cs`, `src/Cryptum.Data/`, migration via `schema.sh`
+- **Change:** On edit, retain the prior ciphertext, nonce and wrapped DEK as a version row against the stable Item id, instead of replacing them (ADR-0006). Each version keeps its own DEK, so restoring one needs no re-encryption. Cap retained versions per Item so history cannot grow without bound.
+- **Verify:** Test — edit an Item twice, restore version 1, confirm the original plaintext returns. Confirm cross-user access to a version is refused, same as for Items: history must not become an IDOR bypass around the Item-level check.
+- **Why first:** MVP ships with unrecoverable overwrite. This closes a real data-loss gap and is the reason Phase 3 leads with it rather than with Files.
 
 ### 3.1 Blob storage path
 - **Files:** `src/Cryptum.Infrastructure/BlobStore.cs`, `ItemsController`
@@ -209,8 +215,10 @@ The subagent-per-task cost is justified here: this is security-critical code whe
 
 No task is marked done on "it compiles." The evidence is the named script and its result.
 
-## Open questions, not resolved by this plan
+## Previously-open questions, now decided
 
-1. **Key Vault retention vs. the deletion promise** (Phase 4.3) — needs a compliance answer before launch.
-2. **Version history priority.** ADR-0006 records that overwrite-on-edit is unrecoverable data loss for a password manager. This plan defers it; if that is unacceptable for v1, it belongs in Phase 2, not after.
-3. **Certificate pinning on Android.** Raised in review, never decided. It defends wrapped DEKs and ciphertext in transit against a CA compromise, at meaningful mobile-maintenance cost. Currently out of scope by omission rather than by decision.
+All three are recorded in ADRs; listed here so the plan reflects them.
+
+1. **Key Vault retention** — 7-day soft-delete, purge protection disabled (ADR-0003). Phase 1.1 must set the window explicitly; Phase 4.3 is now a documentation task rather than an open decision.
+2. **Version history** — ships as the first item of Phase 3, ahead of Files (ADR-0006). See 3.0 below.
+3. **Certificate pinning** — out of scope for MVP, by decision rather than omission (ADR-0007).

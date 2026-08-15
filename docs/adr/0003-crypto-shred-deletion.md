@@ -6,4 +6,8 @@ Account deletion deletes the User's KEK from Key Vault first (crypto-shred — e
 
 ## Consequences
 
-Key Vault soft-delete (and possibly purge-protection, depending on policy) means the KEK itself may remain recoverable by an Azure admin for a retention window (typically 7–90 days) after "deletion." Crypto-shred still achieves the practical goal — the backend and any attacker without Key Vault admin access cannot decrypt anything — but if a compliance requirement demands immediate, unrecoverable purge, the Key Vault soft-delete retention window must be explicitly reviewed against that requirement before launch, not assumed compliant.
+Key Vault soft-delete means the KEK remains recoverable by an Azure admin for a retention window after "deletion."
+
+**Decided: 7-day retention (the minimum), purge protection disabled.** Crypto-shred is effective immediately against the application and against any attacker without Key Vault administrative rights, which is the threat that matters for user data. A short, documented deletion timeline is a defensible reading of erasure obligations, and it avoids the trade the alternatives demand: forcing an immediate purge requires purge protection to stay off permanently, which would also let an attacker with Key Vault admin rights irreversibly destroy *live* users' Vaults, while a 90-day protected window would leave deleted accounts recoverable for a quarter.
+
+Consequences of this choice: infrastructure must set the 7-day window explicitly rather than inheriting a default, the deletion timeline must be stated in user-facing privacy copy rather than implied, and if a future compliance regime demands immediate unrecoverable erasure this decision has to be reopened along with the purge-protection posture it depends on.

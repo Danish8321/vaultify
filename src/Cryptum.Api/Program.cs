@@ -18,6 +18,8 @@ builder.Services.AddDbContext<CryptumDbContext>(options =>
 
 builder.Services.AddScoped<IItemRepository, ItemRepository>();
 builder.Services.AddScoped<IAuditLog, AuditLog>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<UserProvisioning>();
 builder.Services.AddScoped<VaultService>();
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -75,6 +77,10 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+
+// After authentication (it needs the resolved identity) and before the
+// endpoints, so a new User's first request provisions rather than 500s.
+app.UseMiddleware<UserProvisioningMiddleware>();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 app.MapItemEndpoints();

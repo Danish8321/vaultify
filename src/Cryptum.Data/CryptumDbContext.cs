@@ -20,11 +20,14 @@ public sealed class CryptumDbContext(DbContextOptions<CryptumDbContext> options)
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
+    public DbSet<User> Users => Set<User>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfiguration(new ItemConfiguration());
         modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
 
         if (Database.IsSqlite())
         {

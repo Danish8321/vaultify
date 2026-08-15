@@ -23,9 +23,46 @@ public sealed class KeyVaultKeyWrapper(KeyClient keyClient, TokenCredential cred
     // key-plus-metadata, or that headroom would matter.
     private static readonly KeyWrapAlgorithm WrapAlgorithm = KeyWrapAlgorithm.RsaOaep256;
 
+    public async Task EnsureKekAsync(UserId owner, CancellationToken cancellationToken = default)
+    {
+        var name = KekName(owner);
+        try
+        {
+            await keyClient.GetKeyAsync(name, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Not provisioned yet — fall through and create.
+        }
+
+        var options = new CreateRsaKeyOptions(name) { KeySize = 2048 };
+        options.KeyOperations.Add(KeyOperation.WrapKey);
+        options.KeyOperations.Add(KeyOperation.UnwrapKey);
+
+        // Key Vault offers no create-if-absent, so two concurrent provisioning
+        // calls can both reach this line and produce two *versions* of one key.
+        // That is survivable rather than destructive: each Item records the
+        // version that wrapped it, so both versions stay unwrappable and no data
+        // is orphaned. It is wasteful, not lossy.
+        await keyClient.CreateRsaKeyAsync(options, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<WrappedDek> WrapAsync(UserId owner, ReadOnlyMemory<byte> dek, CancellationToken cancellationToken = default)
     {
-        var key = await GetOrCreateKekAsync(owner, cancellationToken).ConfigureAwait(false);
+        KeyVaultKey key;
+        try
+        {
+            key = await keyClient.GetKeyAsync(KekName(owner), cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Wrap no longer creates the KEK. Provisioning is an explicit step
+            // (UserProvisioning); creating a key here would mean a
+            // crypto-shredded account silently regrew a Vault on its next write.
+            throw new KeyUnavailableException($"No KEK available for {owner}.");
+        }
+
         var crypto = new CryptographyClient(key.Id, credential);
 
         var result = await crypto.WrapKeyAsync(WrapAlgorithm, dek.ToArray(), cancellationToken).ConfigureAwait(false);
@@ -62,23 +99,6 @@ public sealed class KeyVaultKeyWrapper(KeyClient keyClient, TokenCredential cred
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
             // Already shredded. Deletion is idempotent so a retried purge does not fail.
-        }
-    }
-
-    private async Task<KeyVaultKey> GetOrCreateKekAsync(UserId owner, CancellationToken cancellationToken)
-    {
-        var name = KekName(owner);
-        try
-        {
-            return await keyClient.GetKeyAsync(name, cancellationToken: cancellationToken).ConfigureAwait(false);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            var options = new CreateRsaKeyOptions(name) { KeySize = 2048 };
-            options.KeyOperations.Add(KeyOperation.WrapKey);
-            options.KeyOperations.Add(KeyOperation.UnwrapKey);
-
-            return await keyClient.CreateRsaKeyAsync(options, cancellationToken).ConfigureAwait(false);
         }
     }
 

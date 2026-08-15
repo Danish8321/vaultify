@@ -16,11 +16,11 @@ Last updated 2026-08-15. A task is marked done only with the named script and it
 | 2.1 Item schema | done | `InitialItemSchema` migration read and corrected before applying |
 | 2.2 Owner-scoped data access | done | IDOR tests pass; removing the owner predicate makes them fail |
 | 2.3 `IKeyWrapper` seam | done | 27 unit tests, incl. cross-user unwrap and shred permanence |
-| 2.4 KEK provisioning on signup | not started | — |
+| 2.4 KEK provisioning on signup | done | concurrency test reports 8 KEKs when idempotency is removed, 1 when restored |
 | 2.5 API contract | done (server side) | `contract.sh` exits 1 on an injected contract change and 0 when reverted; client generation lands with 2.11 |
 | 2.6 Item endpoints | done | 8 integration tests against the real JWT handler |
 | 2.7 Audit log | partial | domain, mapping and migration done; the INSERT-only DB principal needs a database, so the tamper test is blocked on Phase 1 |
-| 2.8 Rate limiting | partial | buckets wired; the 429 separation test is not written |
+| 2.8 Rate limiting | done | unwrap budget exhausts at 20 while CRUD still serves 200; fails if the buckets are equalised |
 | 2.9–2.14 Android and e2e | not started | — |
 
 One gap is worth naming because it weakens a later claim until closed: no test yet demonstrates that the audit trail resists deletion by the application (2.7), and that needs a real database.

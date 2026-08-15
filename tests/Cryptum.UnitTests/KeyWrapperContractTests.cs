@@ -23,6 +23,7 @@ public sealed class KeyWrapperContractTests
     {
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var dek = NewDek();
 
         var wrapped = await wrapper.WrapAsync(owner, dek);
@@ -36,6 +37,7 @@ public sealed class KeyWrapperContractTests
     {
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var dek = NewDek();
 
         var wrapped = await wrapper.WrapAsync(owner, dek);
@@ -52,9 +54,10 @@ public sealed class KeyWrapperContractTests
         using var wrapper = new InMemoryKeyWrapper();
         var alice = new UserId(Guid.CreateVersion7());
         var mallory = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(alice);
+        await wrapper.EnsureKekAsync(mallory);
 
         var wrapped = await wrapper.WrapAsync(alice, NewDek());
-        await wrapper.WrapAsync(mallory, NewDek()); // ensure Mallory has a KEK
 
         await Assert.ThrowsAnyAsync<CryptographicException>(
             () => wrapper.UnwrapAsync(mallory, wrapped));
@@ -67,6 +70,7 @@ public sealed class KeyWrapperContractTests
         // but without the KEK it can never be read again.
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var wrapped = await wrapper.WrapAsync(owner, NewDek());
 
         await wrapper.CryptoShredAsync(owner);
@@ -81,6 +85,7 @@ public sealed class KeyWrapperContractTests
         // The async purge worker (plan task 4.2) retries; a second shred must not throw.
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         await wrapper.WrapAsync(owner, NewDek());
 
         await wrapper.CryptoShredAsync(owner);
@@ -94,6 +99,7 @@ public sealed class KeyWrapperContractTests
         // correlate identical DEKs across Items.
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var dek = NewDek();
 
         var first = await wrapper.WrapAsync(owner, dek);
@@ -110,6 +116,7 @@ public sealed class KeyWrapperContractTests
         // silently stops being true.
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var wrapped = await wrapper.WrapAsync(owner, NewDek());
 
         var unwrapped = await wrapper.UnwrapAsync(owner, wrapped);
@@ -127,6 +134,7 @@ public sealed class KeyWrapperContractTests
         // a double dispose must not throw during error handling.
         using var wrapper = new InMemoryKeyWrapper();
         var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
         var wrapped = await wrapper.WrapAsync(owner, NewDek());
 
         var unwrapped = await wrapper.UnwrapAsync(owner, wrapped);

@@ -16,12 +16,50 @@ namespace Cryptum.TestSupport;
 public sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
 {
     private readonly ConcurrentDictionary<UserId, RSA> keks = new();
+    private readonly ConcurrentDictionary<UserId, int> kekCreations = new();
 
     public int UnwrapCount { get; private set; }
 
+    /// <summary>How many distinct KEKs this wrapper has created for the owner.</summary>
+    /// <remarks>
+    /// Exists so a test can assert that a provisioning race produced exactly one
+    /// KEK. Counting creations is the only way to observe the second KEK — the
+    /// dictionary would look identical either way.
+    /// </remarks>
+    public int KeksCreatedFor(UserId owner) => kekCreations.GetValueOrDefault(owner);
+
+    public Task EnsureKekAsync(UserId owner, CancellationToken cancellationToken = default)
+    {
+        // Counted this way on purpose. ConcurrentDictionary.GetOrAdd may invoke
+        // its factory more than once under contention and discard the losers, so
+        // counting inside the factory would count attempts rather than the KEK
+        // that actually ended up installed — and the test would report a race
+        // that never happened.
+        var candidate = RSA.Create(2048);
+        var installed = keks.GetOrAdd(owner, candidate);
+
+        if (ReferenceEquals(installed, candidate))
+        {
+            kekCreations.AddOrUpdate(owner, 1, (_, count) => count + 1);
+        }
+        else
+        {
+            candidate.Dispose();
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<WrappedDek> WrapAsync(UserId owner, ReadOnlyMemory<byte> dek, CancellationToken cancellationToken = default)
     {
-        var kek = keks.GetOrAdd(owner, _ => RSA.Create(2048));
+        // Deliberately does NOT create the KEK on demand. A fake more forgiving
+        // than production hides exactly the bug it should catch: an unprovisioned
+        // User whose first write would fail against real Key Vault.
+        if (!keks.TryGetValue(owner, out var kek))
+        {
+            throw new KeyUnavailableException($"No KEK for {owner}; the User was never provisioned.");
+        }
+
         var wrapped = kek.Encrypt(dek.ToArray(), RSAEncryptionPadding.OaepSHA256);
         return Task.FromResult(new WrappedDek(wrapped, "v1"));
     }

@@ -10,7 +10,19 @@ namespace Cryptum.Domain;
 /// </remarks>
 public interface IKeyWrapper
 {
-    /// <summary>Wraps a plaintext DEK under the User's KEK, creating the KEK if this is their first Item.</summary>
+    /// <summary>
+    /// Creates the User's KEK if it does not already exist. Idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Provisioning is explicit rather than a side effect of the first wrap:
+    /// concurrent first requests must converge on one KEK, and a second KEK
+    /// would orphan every DEK wrapped under the first. Implementations must
+    /// treat a concurrent create as success, not as an error.
+    /// </remarks>
+    Task EnsureKekAsync(UserId owner, CancellationToken cancellationToken = default);
+
+    /// <summary>Wraps a plaintext DEK under the User's KEK.</summary>
+    /// <exception cref="KeyUnavailableException">The User has not been provisioned, or was crypto-shredded.</exception>
     Task<WrappedDek> WrapAsync(UserId owner, ReadOnlyMemory<byte> dek, CancellationToken cancellationToken = default);
 
     /// <summary>Unwraps a DEK previously wrapped under the same User's KEK.</summary>

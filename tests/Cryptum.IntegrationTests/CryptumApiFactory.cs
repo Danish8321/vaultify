@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -37,6 +38,9 @@ public sealed class CryptumApiFactory : WebApplicationFactory<Program>
 
     public InMemoryKeyWrapper KeyWrapper { get; } = new();
 
+    /// <summary>Everything the host logged during the test.</summary>
+    public CapturingLoggerProvider Logs { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -55,6 +59,8 @@ public sealed class CryptumApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IKeyWrapper>();
             services.AddSingleton<IKeyWrapper>(KeyWrapper);
+
+            services.AddSingleton<ILoggerProvider>(Logs);
 
             services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>>(
                 new TestSigningKeyConfiguration(SigningKey));

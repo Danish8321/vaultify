@@ -1,6 +1,6 @@
 # 03 — Nothing prevents a DEK reaching the logs
 
-Status: open
+Status: resolved
 Severity: high
 Source: plan tasks 2.3 and 2.6, security-requirements
 
@@ -15,3 +15,25 @@ The plaintext DEK crossing the network is already the accepted cost of being ser
 ## Done when
 
 A test asserts that no log output from a create-then-read cycle contains the DEK bytes. Log capture, real endpoints, real DEK — searching the captured output for the actual byte sequence.
+
+## Comments
+
+Closed by `tests/Cryptum.IntegrationTests/KeyMaterialLoggingTests.cs` (2 tests) plus
+`CapturingLoggerProvider.cs`, registered in `CryptumApiFactory` as an `ILoggerProvider`.
+
+The capture is deliberately wider than the formatted message. It also records
+`state.ToString()`, the exception, and every structured `KeyValuePair` value,
+because `LogInformation("{@Item}", response)` — the exact leak this ticket
+describes — puts the DEK in the *state*, not in the format string. Capturing
+only the rendered message would have made the test pass while the leak was live.
+
+Searched in both base64 (how JSON renders a `byte[]`) and hex (how a debugger or
+a hand-rolled dump renders it).
+
+Mutation-verified: injecting a `LoggerMessage.Define`-based DEK log into
+`ItemEndpoints.ReadAsync` produced
+`Assert.DoesNotContain() Failure: Sub-string found`. The naive `LogInformation`
+mutation would not compile — CA1848 and CA1873 reject it — which is itself a
+second, weaker line of defence.
+
+Verified: `test-full.sh` OK, 31 unit + 11 integration.

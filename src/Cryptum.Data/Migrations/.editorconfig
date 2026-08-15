@@ -1,0 +1,7 @@
+# EF Core writes this directory. Analyzer rules that ask for hand-tuning of
+# generated code produce noise a developer cannot act on without editing
+# generated output — and an applied migration must never be edited at all.
+# Correctness rules still apply everywhere else in the project.
+[*.cs]
+generated_code = true
+dotnet_diagnostic.CA1861.severity = none

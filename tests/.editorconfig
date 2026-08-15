@@ -1,0 +1,8 @@
+# Scoped to tests/ only. The solution-wide analyzer settings still apply to src/.
+[*.cs]
+
+# CA1707 (no underscores in member names) targets identifiers that library
+# consumers bind against. Test method names are never consumed as API, and
+# underscores are what make an assertion's intent readable in a failure report.
+# Disabled here only — src/ remains subject to the rule.
+dotnet_diagnostic.CA1707.severity = none

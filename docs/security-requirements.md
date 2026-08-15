@@ -14,3 +14,5 @@ Must-implement controls, not architectural decisions — no real alternative was
 - AES-GCM nonces are 96-bit, CSPRNG-generated, fresh per encryption, and never reused with a given DEK (see [ARCHITECTURE.md](./ARCHITECTURE.md)).
 - Request/response bodies are excluded from API logging and error reporting — logging a body would capture ciphertext and, on the unwrap path, plaintext DEKs.
 - Public claims about Cryptum must say "server-blind", never "zero-knowledge" or "end-to-end encrypted" (see ADR-0001).
+- Unwrapped DEKs are held in `PlaintextDek` and zeroed on disposal. This bounds how long key material survives in process memory; it does not protect against a live compromised process, which remains ADR-0002's accepted residual risk.
+- Item ownership is enforced as a predicate inside every data-access query. `IItemRepository` deliberately exposes no by-id lookup, so the unsafe call is unwriteable rather than merely discouraged. Covered by `ItemRepositoryIdorTests`, which is mutation-tested: removing the owner predicate makes it fail.

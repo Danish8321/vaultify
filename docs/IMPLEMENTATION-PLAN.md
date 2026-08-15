@@ -2,9 +2,32 @@
 
 Design is settled: see [CONTEXT.md](../CONTEXT.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [adr/](./adr/), [security-requirements.md](./security-requirements.md). This plan sequences the build only — it makes no new architectural decisions. Where it would have had to, that is called out as an open question rather than resolved silently.
 
+## Status
+
+Last updated 2026-08-15. A task is marked done only with the named script and its result.
+
+| Task | State | Evidence |
+|---|---|---|
+| 0.1 Repo skeleton | done | `dotnet sln list` shows 8 projects |
+| 0.2 Verification scripts | done | `check.sh` exits 1 on an injected `CS0029`; all scripts exit 0 otherwise |
+| 0.3 CI pipeline | not started | — |
+| 1.1–1.3, 1.5 Azure infra | **deferred** | skipped by decision to reach a working slice first; nothing is deployed |
+| 1.4 B2C token validation | partial | validation code and its tests are done and real; the B2C tenant itself is not provisioned |
+| 2.1 Item schema | done | `InitialItemSchema` migration read and corrected before applying |
+| 2.2 Owner-scoped data access | done | IDOR tests pass; removing the owner predicate makes them fail |
+| 2.3 `IKeyWrapper` seam | done | 27 unit tests, incl. cross-user unwrap and shred permanence |
+| 2.4 KEK provisioning on signup | not started | — |
+| 2.5 API contract | partial | contracts written; `openapi.json` not generated, so `contract.sh` is still a no-op |
+| 2.6 Item endpoints | done | 8 integration tests against the real JWT handler |
+| 2.7 Audit log | partial | domain, mapping and migration done; the INSERT-only DB principal needs a database, so the tamper test is blocked on Phase 1 |
+| 2.8 Rate limiting | partial | buckets wired; the 429 separation test is not written |
+| 2.9–2.14 Android and e2e | not started | — |
+
+Two gaps are worth naming because they weaken later claims until closed. `contract.sh` passing currently proves nothing (2.5), and no test yet demonstrates that the audit trail resists deletion by the application (2.7).
+
 ## Sequencing principle
 
-The repo is currently empty, so there is no way to verify anything. Phase 0 therefore builds the verification scripts before any feature code, because every later task's completion depends on being able to run them.
+Phase 0 built the verification scripts before any feature code, because every later task's completion depends on being able to run them.
 
 After that, the unit of work is a vertical slice, not a tier. Phase 2 ships one Secret through every layer — schema, domain, API contract, Android client, tests at each crossing — before Phase 3 widens to Files. A tier built "to be wired up later" is not a shippable increment and is explicitly not how this plan is ordered.
 
@@ -60,6 +83,7 @@ Nothing here is a feature. It exists so that "done" means something for every ta
 - **Files:** `infra/b2c/*`, `src/Cryptum.Api/Auth/`
 - **Change:** B2C tenant with sign-up/sign-in and password-reset flows. API validates JWT issuer, audience, signature, and expiry. Reject unsigned and expired tokens explicitly.
 - **Verify:** Integration test — a valid token reaches a protected endpoint; tampered signature, wrong audience, and expired token each return 401. All four cases tested, not just the happy path.
+- **As built (validation half only):** `tests/Cryptum.IntegrationTests/` covers all four cases plus a wrong-issuer case. The test host runs the **production** `JwtBearer` handler and swaps only the signing key it trusts — a fake authentication handler would have made every one of these tests vacuous, proving the endpoint reads a claim rather than that a forged token is rejected. Confirmed non-vacuous by mutation: setting `ValidateAudience = false` or restoring the default 5-minute `ClockSkew` makes two of them fail. The B2C tenant itself is still unprovisioned, so the tokens are test-minted.
 
 ### 1.5 TLS and security headers
 - **Files:** `infra/modules/appservice.bicep`, `src/Cryptum.Api/Program.cs`
@@ -73,7 +97,8 @@ Nothing here is a feature. It exists so that "done" means something for every ta
 This is the slice that proves the architecture. Every task below crosses a tier boundary and is verified at that crossing.
 
 ### 2.1 Schema for Item
-- **Files:** `src/Cryptum.Data/Entities/Item.cs`, migration via `schema.sh`
+- **Files:** `src/Cryptum.Domain/Item.cs`, `src/Cryptum.Data/CryptumDbContext.cs`, migration via `schema.sh`
+- **As built:** `Item` lives in `Cryptum.Domain`, not `Cryptum.Data` — the entity carries the invariants (fresh DEK and nonce on every write), so putting it behind the persistence boundary would have made the domain depend on EF. Mapping stays in `ItemConfiguration`. The index shipped as `(Owner, DeletedAt, Id)`: the global soft-delete filter appends `DeletedAt` to every query, so an `(Owner, Id)` index would have left the common read a partial scan.
 - **Change:** `Item` — id, ownerId, type discriminator, plaintext title, wrapped DEK, nonce, blob pointer (nullable), created/updated timestamps. Identity is stable and separate from content and key material, so a versions table can be added later without migrating rows (ADR-0006). Index on `(ownerId, id)` — the shape every authorized query uses.
 - **Verify:** Run `schema.sh`; **read the generated migration before applying it** and confirm it creates rather than drops. Apply to dev; round-trip an entity.
 
@@ -83,7 +108,8 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Verify:** Unit test — user B requests user A's Item id and gets not-found, for every repository method. This is the IDOR test and it is mandatory, not optional.
 
 ### 2.3 `IKeyWrapper` seam and Key Vault implementation
-- **Files:** `src/Cryptum.Domain/IKeyWrapper.cs`, `src/Cryptum.Infrastructure/KeyVaultKeyWrapper.cs`, `tests/Fakes/InMemoryKeyWrapper.cs`
+- **Files:** `src/Cryptum.Domain/IKeyWrapper.cs`, `src/Cryptum.Infrastructure/KeyVaultKeyWrapper.cs`, `tests/Cryptum.TestSupport/InMemoryKeyWrapper.cs`
+- **As built:** the fake sits in a shared `Cryptum.TestSupport` project because both test projects need it, and a duplicated crypto fake would drift the moment `IKeyWrapper` changes. It is backed by real in-process RSA, not a stub, so tests exercise the production failure modes.
 - **Change:** `WrapAsync(userId, dek)` / `UnwrapAsync(userId, wrappedDek)` over RSA-OAEP-256. Per-user KEK created on first use. The plaintext DEK is never logged, never persisted, and its buffer is cleared after use.
 - **Verify:** Integration test against real Key Vault — wrap then unwrap returns the original bytes. Unit tests elsewhere use the fake. Assert via log capture that no test ever emits DEK material.
 
@@ -98,12 +124,14 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Verify:** `contract.sh` passes. Malformed input returns 422 with no internal detail.
 
 ### 2.6 Item endpoints
-- **Files:** `src/Cryptum.Api/Controllers/ItemsController.cs`
+- **Files:** `src/Cryptum.Api/Endpoints/ItemEndpoints.cs`, `src/Cryptum.Api/Auth/CallerIdentity.cs`, `src/Cryptum.Domain/VaultService.cs`
 - **Change:** Wire the endpoints to repository plus `IKeyWrapper`. Owner comes from the validated token subject, never from the request body — a body-supplied ownerId is the classic privilege-escalation hole.
 - **Verify:** Integration test of the full create-then-read cycle. Plus the cross-user test: user B is refused on every endpoint. Confirm request/response bodies are absent from logs (they would contain DEKs).
+- **As built:** minimal APIs rather than a controller, and the endpoints delegate to `VaultService` rather than composing the repository and key wrapper themselves — "check the owner, unwrap, write an audit row" is then impossible to half-forget on one route out of several. A stranger's read returns **404, not 403**: 403 would confirm the Item exists and let an attacker enumerate valid ids. `CallerIdentity` hashes the B2C subject into a stable GUID, since subjects are opaque strings and not necessarily GUIDs. The log-absence assertion is not yet written.
 
 ### 2.7 Audit log
-- **Files:** `src/Cryptum.Data/AuditEntry.cs`, `src/Cryptum.Api/Auditing/`
+- **Files:** `src/Cryptum.Domain/AuditEntry.cs`, `src/Cryptum.Data/AuditLog.cs`, `src/Cryptum.Data/AuditEntryConfiguration.cs`
+- **As built:** `IAuditLog` exposes only `RecordAsync` — no update or delete method exists, so tampering cannot be expressed in C# at all. `AuditLog` saves immediately rather than enlisting in the caller's unit of work: a rolled-back operation would otherwise erase exactly the evidence an incident review needs. `AuditEntries` carries **no** soft-delete filter, because the record that a crypto-shred happened must outlive the Items it destroyed. The INSERT-only DB principal and the UPDATE/DELETE-refused test remain outstanding — they need a real database.
 - **Change:** Record every wrap, unwrap, and Item access — actor, action, item id, timestamp, outcome. Written through an INSERT-only DB principal, and shipped to Log Analytics as the tamper-resistant source of truth (security-requirements). Never record DEKs or ciphertext.
 - **Verify:** Test — an unwrap produces exactly one audit row. Attempt UPDATE and DELETE as the audit principal and confirm both are refused. Untamperable-by-construction is the requirement; an append-only table that the app can still delete from is not one.
 
@@ -111,6 +139,7 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Files:** `src/Cryptum.Api/Program.cs`
 - **Change:** Per-user rate limits, with a stricter bucket on the unwrap path than on general CRUD (security-requirements).
 - **Verify:** Test — exceeding the unwrap limit returns 429 while ordinary CRUD still succeeds, proving the buckets are actually separate.
+- **As built:** 100/min globally, 20/min on `GET /items/{id}`, which is the only route that costs a Key Vault unwrap. Partitioned by **caller identity, not IP**: a shared NAT must not let one user drain another's budget, and an attacker rotating IPs must not get a fresh one. Unauthenticated requests fall back to an IP partition, since there is no identity to key on. The 429 separation test is still to write, so the buckets are wired but not yet proven distinct.
 
 ### 2.9 Android: crypto core
 - **Files:** `android/core-crypto/`

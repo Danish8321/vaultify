@@ -55,6 +55,22 @@ AES-GCM security collapses if a nonce is ever reused with the same key — reuse
 
 Delete the User's KEK (crypto-shred) → soft-delete rows → purge rows and blobs asynchronously. See ADR-0003.
 
+## Request-level controls
+
+Every request crosses the same three gates before it can touch an Item, in this order:
+
+1. **Token validation** — issuer, audience, signature and expiry, with `ClockSkew` set to zero so a stolen token does not outlive the short expiry ADR-0004 chose. `Auth/AuthenticationSetup.cs`.
+2. **Identity resolution** — the owner is derived from the validated token subject and from nowhere else. `Auth/CallerIdentity.cs` is the only sanctioned source; no request contract has an owner field, so a body-supplied owner is not merely rejected but unrepresentable.
+3. **Owner-scoped query** — the owner predicate lives inside the LINQ query, and no repository method can fetch an Item by id alone. The unsafe call is unwriteable rather than merely discouraged.
+
+Rate limits partition by caller identity rather than IP, so a shared NAT cannot let one User exhaust another's budget and rotating IPs earns no fresh allowance. The read path carries a stricter bucket than general CRUD because each read costs one Key Vault unwrap — the operation ADR-0002 identifies as the one worth watching.
+
+A read that is denied and an Item that does not exist return the identical response. Distinguishing them would let an attacker enumerate valid Item ids.
+
+## Implementation status
+
+As of 2026-08-15 the backend slice — schema, domain, repository, key-wrapper seam, audit trail, endpoints, token validation — is built and verified against SQLite and an in-process KEK store. **No Azure resource is provisioned.** Key Vault, SQL, Blob Storage, App Service and the B2C tenant are all still Phase 1, so the production wrap/unwrap path and the INSERT-only audit principal are written but unexercised. The Android client does not exist yet. Task-level detail is in [IMPLEMENTATION-PLAN.md](./IMPLEMENTATION-PLAN.md).
+
 ## Scope boundaries (MVP)
 
 Deliberately excluded, each recoverable later without redesign:

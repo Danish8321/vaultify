@@ -11,6 +11,16 @@
          transitive version could change under us unnoticed. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 
+    <!-- Supply-chain gate. Audit defaults to direct references only, which
+         misses the case that actually happens: a vulnerability arriving three
+         levels down a dependency we never chose. "all" covers transitives, and
+         "low" refuses to decide on our behalf which severities are ignorable —
+         triage is a human judgement, made against the advisory, not a default.
+         NU1901-NU1904 become errors via TreatWarningsAsErrors below. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
     <!-- check.sh is only meaningful if warnings can fail it. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

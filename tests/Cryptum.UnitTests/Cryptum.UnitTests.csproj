@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cryptum.Domain\Cryptum.Domain.csproj" />
+    <ProjectReference Include="..\Cryptum.TestSupport\Cryptum.TestSupport.csproj" />
     <ProjectReference Include="..\..\src\Cryptum.Data\Cryptum.Data.csproj" />
     <ProjectReference Include="..\..\src\Cryptum.Infrastructure\Cryptum.Infrastructure.csproj" />
   </ItemGroup>

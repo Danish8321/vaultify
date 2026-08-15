@@ -7,10 +7,14 @@
 
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
     <!-- Transitive pin: Microsoft.AspNetCore.OpenApi 10.0.10 pulls Microsoft.OpenApi 2.0.0,
          which carries GHSA-v5pm-xwqc-g5wc (high). Pinned forward, not suppressed. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Auth">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup Label="Persistence">
@@ -24,7 +28,9 @@
     <PackageVersion Include="Azure.Security.KeyVault.Keys" Version="4.10.0" />
     <!-- >= 1.17.1 required: EF Core SqlServer -> Microsoft.Data.SqlClient 6.1.6
          depends on it, and central pinning turns a downgrade into a hard NU1109. -->
-    <PackageVersion Include="Azure.Identity" Version="1.19.0" />
+    <!-- 1.21.0, not 1.19.0: Azure.Core 1.54 also declares DefaultAzureCredential,
+         and only 1.21.0 type-forwards it, so older pins make the type ambiguous. -->
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
   </ItemGroup>
 
   <ItemGroup Label="Test">
@@ -32,6 +38,7 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
   </ItemGroup>
 
 </Project>

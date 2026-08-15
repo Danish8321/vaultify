@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Cryptum.Domain;
 
-namespace Cryptum.UnitTests.Fakes;
+namespace Cryptum.TestSupport;
 
 /// <summary>
 /// Test double for <see cref="IKeyWrapper"/>, backed by real in-process RSA keys.
@@ -13,7 +13,7 @@ namespace Cryptum.UnitTests.Fakes;
 /// this seam every test touching the crypto path would need live Azure
 /// credentials, which would leave the most security-critical code the least tested.
 /// </remarks>
-internal sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
+public sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
 {
     private readonly ConcurrentDictionary<UserId, RSA> keks = new();
 

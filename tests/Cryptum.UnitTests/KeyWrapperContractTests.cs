@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using Cryptum.Domain;
-using Cryptum.UnitTests.Fakes;
+using Cryptum.TestSupport;
 
 namespace Cryptum.UnitTests;
 

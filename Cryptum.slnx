@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Cryptum.IntegrationTests/Cryptum.IntegrationTests.csproj" />
+    <Project Path="tests/Cryptum.TestSupport/Cryptum.TestSupport.csproj" />
     <Project Path="tests/Cryptum.UnitTests/Cryptum.UnitTests.csproj" />
   </Folder>
 </Solution>

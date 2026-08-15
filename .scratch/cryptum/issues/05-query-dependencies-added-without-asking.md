@@ -1,6 +1,6 @@
 # 05 — QUERY: dependencies added without asking
 
-Status: needs decision from user
+Status: resolved
 Type: query
 Severity: process
 Source: CLAUDE.md — "no new dependency without asking"
@@ -23,3 +23,7 @@ All are first-party Microsoft or Azure. None are transitive-only surprises.
 ## Decision needed
 
 Ratify these, or name any to revert. If the answer is "ask every time from here", say so and I will stop and ask before the next one.
+
+## Comments
+
+**Ratified by the user on 2026-08-15.** All six kept. The standing rule still applies: ask before the next new dependency.

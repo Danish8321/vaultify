@@ -1,6 +1,6 @@
 # 08 — QUERY: local branch name no longer matches what it holds
 
-Status: needs decision from user
+Status: resolved
 Type: query
 Severity: low
 
@@ -14,3 +14,9 @@ Local branch is `phase-0-verification-harness`, tracking `origin/main`. It stopp
 2. Keep feature branches and open PRs into `main` — better once CI exists (see 07), heavier now.
 
 Recommend 1 now, moving to 2 when CI lands.
+
+## Comments
+
+**Resolved 2026-08-15.** Local branch renamed `phase-0-verification-harness` -> `main`, tracking `origin/main` directly. A plain `git push` now does the right thing; the explicit refspec mapping is no longer needed.
+
+Option 2 (PR workflow) remains worth revisiting once CI exists — see 07.

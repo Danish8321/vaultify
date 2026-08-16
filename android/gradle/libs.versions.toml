@@ -1,0 +1,11 @@
+# Single place where versions are ratified. Kept deliberately small: every entry
+# is a dependency someone has to keep reviewing.
+#
+# No property-testing library is listed on purpose. The one property task 2.9
+# calls for — "no nonce repeats across many generations" — is a loop and a set.
+# A framework would be a new dependency bought for a five-line test.
+[versions]
+kotlin = "2.3.21"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

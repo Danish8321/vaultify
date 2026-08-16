@@ -30,3 +30,7 @@ include(":core-crypto")
 // Instrumented-only companion. Holds no production code; it exists so the
 // vectors above can be run against Conscrypt on a device.
 include(":core-crypto-android")
+
+// Keystore-backed token storage. Android-only by necessity: AndroidKeyStore has
+// no JVM equivalent, so unlike core-crypto this cannot be tested off-device.
+include(":core-auth")

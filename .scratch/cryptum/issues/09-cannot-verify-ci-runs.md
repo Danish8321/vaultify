@@ -35,3 +35,27 @@ run is green, and confirm a deliberate formatting violation goes red — the
 ## Comments
 
 Needs the user: authentication is interactive and cannot be done from a tool call.
+
+## Update 2026-08-16 — chosen route is a token, which is not set yet
+
+Chosen: supply a token via the environment rather than fix the keyring. The
+underlying failure is keyring-specific, not credential-specific:
+
+```
+X Failed to log in to github.com account Danish8321 (keyring)
+```
+
+`GH_TOKEN` and `GITHUB_TOKEN` are both unset in this session, so nothing has
+changed yet. To unblock, run in this session:
+
+```
+! export GH_TOKEN=ghp_xxx   # fine-grained token, scope: Actions read
+```
+
+Least privilege applies to this too — reading workflow runs needs only Actions
+read on this one repository. A classic `repo`-scoped token would hand every
+tool in this session write access to the source of a secrets product, which is
+a poor trade for watching a pipeline.
+
+The token lives in the shell environment for the session's lifetime, so it
+should be short-lived and should not be written into any file in the repo.

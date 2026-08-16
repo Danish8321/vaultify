@@ -42,7 +42,13 @@ Ordering is deliberate and matches the existing rationale: KEK first (so a
 mid-failure leaves unreadable data rather than a half-deleted readable Vault),
 rows second, the `Users` row last.
 
-## Decision embedded here, worth confirming
+## Decision — confirmed 2026-08-16
+
+**Start over.** No tombstone, no 410. The implemented behaviour stands and this
+question is closed; reopening it means a new table, a migration and a
+provisioning check, so it should be reopened deliberately or not at all.
+
+Original framing, kept for the reasoning:
 
 "Deleting your account" now means **start over**, not **never come back**. The
 B2C identity still exists, so nothing stops that user re-registering anyway;

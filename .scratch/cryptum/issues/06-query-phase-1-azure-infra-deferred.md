@@ -1,6 +1,6 @@
 # 06 — QUERY: Phase 1 Azure infra is deferred, and it now blocks real work
 
-Status: needs decision from user
+Status: unblocked — subscription available (2026-08-16); deploy not yet authorised
 Type: query
 Severity: high
 Source: user instruction "commit phase 0 and move to phase 2"
@@ -25,3 +25,29 @@ Which next:
 2. **Keep going on backend/Android** — accept a growing pile of never-deployed code, and take the integration pain later in one lump.
 
 My recommendation is 1, but the cost is real: it is Azure spend and a chunk of infra work before any new user-visible capability.
+
+## Update 2026-08-16 — the blocker was never the subscription
+
+`az account show` reports an authenticated, Enabled subscription:
+
+```
+name:   Azure subscription
+id:     eaa29895-7743-44bd-9881-e51395ec6ff8
+tenant: b242d7b0-1fae-4655-8bb7-7606c66aaac1 (AZ900Advancedoutlook.onmicrosoft.com)
+```
+
+So Bicep can be authored and deployed. The retention question that had to be
+settled first (task 4.3) is now settled — ADR-0003: 7-day soft-delete, purge
+protection explicitly `false`, shred purges rather than waiting out the window.
+That matters here specifically because `enablePurgeProtection` cannot be
+un-set, so the Key Vault module must assert it rather than omit it.
+
+**Still not authorised: the deploy itself.** Authoring Bicep is free and
+reversible; `az deployment` creates billable resources under a personal
+subscription and is not something to do on my own initiative. The tenant name
+suggests a learning subscription, which may carry credit limits worth checking
+before a Key Vault, SQL database and App Service are stood up.
+
+Next step is therefore: author `infra/` modules, validate with
+`az deployment group what-if` (no resources created), and stop for explicit
+go-ahead before the actual deployment.

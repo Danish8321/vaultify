@@ -1,6 +1,6 @@
 # 10 — No Gradle; Android tasks 2.9–2.13 cannot start
 
-Status: blocked
+Status: unblocked — option 3 (2026-08-16); wrapper still to be committed
 Severity: high
 Source: attempting plan task 2.9
 
@@ -49,6 +49,28 @@ Versions are not yet ratified anywhere: Gradle, Android Gradle Plugin, Kotlin,
 `compileSdk`, `minSdk`. `minSdk` is a security decision, not just a compatibility
 one — StrongBox and the Keystore guarantees task 2.10 depends on vary by API
 level. Proposing compileSdk 36 / minSdk 26 unless told otherwise.
+
+## Resolution (2026-08-16)
+
+No install and no download were needed. Android Studio 2025.3.4 is present and
+Gradle distributions are already unpacked in the wrapper cache:
+
+```
+~/.gradle/wrapper/dists/gradle-{8.11.1,8.13,8.14.3,9.0.0,9.3.1,9.4.1}-bin/
+$ .../gradle-9.4.1/bin/gradle --version   ->  Gradle 9.4.1
+```
+
+A wrapper pinned to 9.4.1 therefore resolves from cache without touching the
+network, which also means the denied download was never actually necessary —
+worth remembering before filing the next "tool missing" ticket: check the cache
+before the installer.
+
+Versions ratified with this: Gradle 9.4.1, compileSdk 36, minSdk 26. `minSdk 26`
+is the security-relevant one — it is the floor at which the Keystore guarantees
+task 2.10 relies on (hardware-backed keys, `setUserAuthenticationRequired` with
+`setInvalidatedByBiometricEnrollment`) are dependable rather than best-effort.
+AGP and Kotlin versions get pinned when the wrapper is generated, against what
+Gradle 9.4.1 actually accepts, rather than guessed now.
 
 ## Done when
 

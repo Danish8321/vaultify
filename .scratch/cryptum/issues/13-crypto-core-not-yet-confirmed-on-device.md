@@ -1,6 +1,6 @@
 # 13 — core-crypto is proven on the JVM, not on Android
 
-Status: open
+Status: resolved 2026-08-16 (CI coverage still outstanding — see the end)
 Severity: medium
 Source: task 2.9
 
@@ -58,3 +58,57 @@ wrong in the same way.
 Also still to do: `zeroing is best-effort on a managed runtime` is asserted in
 KDoc but nothing tests that the array is unreachable afterwards, and nothing can
 — it is a documented limitation, not a testable property.
+
+## Resolution 2026-08-16
+
+`:core-crypto-android` added: an instrumented-only module holding no production
+code, so nothing can be written there that the fast JVM suite cannot reach.
+5 tests, green on the `Android12` AVD (API 37):
+
+```
+Starting 5 tests on Android12(AVD) - 17
+BUILD SUCCESSFUL in 2m
+```
+
+The provider question is answered rather than assumed. Recorded from the device:
+
+```
+AES/GCM/NoPadding provider on device: AndroidOpenSSL
+installed: AndroidNSSP, AndroidOpenSSL, CertPathProvider,
+           AndroidKeyStoreBCWorkaround, BC, HarmonyJSSE, AndroidKeyStore
+```
+
+`AndroidOpenSSL` is Conscrypt, so the gap this ticket named is the one that was
+actually closed — not a JDK provider smuggled onto the device.
+
+The known-answer test is the one that carries the weight: NIST AES-256-GCM
+vector (zero key, zero IV, empty plaintext, tag
+`530f8afbc74536b9a963b4f1c4cb738b`), decrypted by device code that did not
+produce it. Mutation-verified by flipping the tag's last nibble:
+
+```
+javax.crypto.AEADBadTagException: error:1e000065:Cipher functions:
+OPENSSL_internal:BAD_DECRYPT
+```
+
+Conscrypt and the JDK therefore agree on the vector, on round-tripping, on
+rejecting a tampered ciphertext with `AEADBadTagException` specifically (the
+exception type matters — production catches nothing, so a different type would
+crash rather than surface as a handled error), and on producing 2,000 distinct
+nonces from the device entropy source.
+
+Build fixes needed along the way, recorded because each would otherwise be
+rediscovered: plugins must be declared once at the root with `apply false`;
+`sdk.dir` must use forward slashes, since a backslash is an escape character in
+a `.properties` file; and `android.useAndroidX=true` is required by the
+androidx.test dependencies.
+
+### Still outstanding
+
+`connectedAndroidTest` needs a booted device, so it is **not** wired into any
+gate — CI has no emulator. It is run by hand today, which means it can rot
+silently between runs. Closing that needs an emulator step in the workflow
+(`reactivecircus/android-emulator-runner` or equivalent), and that is a new CI
+dependency plus a meaningful increase in job time, so it should be a deliberate
+decision rather than something slipped in. Until then the JVM suite is the
+regression net and this module is a release check.

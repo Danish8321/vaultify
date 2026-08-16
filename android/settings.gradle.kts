@@ -26,3 +26,7 @@ rootProject.name = "cryptum-android"
 // because Android's providers are Conscrypt rather than the JDK's — see the
 // ticket referenced in CryptoCore's KDoc.
 include(":core-crypto")
+
+// Instrumented-only companion. Holds no production code; it exists so the
+// vectors above can be run against Conscrypt on a device.
+include(":core-crypto-android")

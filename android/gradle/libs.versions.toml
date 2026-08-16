@@ -4,17 +4,39 @@
 # No property-testing library is listed on purpose. The one property task 2.9
 # calls for — "no nonce repeats across many generations" — is a loop and a set.
 # A framework would be a new dependency bought for a five-line test.
+# Every version here is an exact pin. No "+" and no ranges: a dynamic version
+# means the build is not reproducible and a dependency can change under us
+# between two runs — the same failure the .NET lockfiles exist to prevent.
 [versions]
 kotlin = "2.3.21"
 agp = "8.13.1"
 androidx-test-runner = "1.7.0"
 androidx-test-junit = "1.3.0"
+compose-bom = "2026.08.00"
+activity-compose = "1.13.0"
+lifecycle = "2.11.0"
+# 1.1.0 is the newest *stable* androidx.biometric. Everything above it is alpha
+# (1.4.0-alpha07 at time of writing), and an alpha is not something to put on
+# the authentication path of a secrets vault. Revisit when 1.2+ ships stable.
+biometric = "1.1.0"
 
 [libraries]
+# The BOM sets the versions of every compose-* artifact below, which is why they
+# carry no version of their own.
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 android-library = { id = "com.android.library", version.ref = "agp" }

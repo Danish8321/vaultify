@@ -34,3 +34,5 @@ include(":core-crypto-android")
 // Keystore-backed token storage. Android-only by necessity: AndroidKeyStore has
 // no JVM equivalent, so unlike core-crypto this cannot be tested off-device.
 include(":core-auth")
+
+include(":feature-lock")

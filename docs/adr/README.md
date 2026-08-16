@@ -9,6 +9,7 @@
 | [0005](./0005-no-kek-rotation-in-mvp.md) | No KEK rotation in MVP | accepted |
 | [0006](./0006-overwrite-on-edit-version-history-deferred.md) | Edits overwrite in place with a fresh DEK; version history deferred | accepted |
 | [0007](./0007-no-certificate-pinning-in-mvp.md) | No certificate pinning in the Android client for MVP | accepted |
+| [0008](./0008-native-kotlin-android-client.md) | Native Kotlin Android client, not .NET MAUI | accepted |
 
 ADRs 0001, 0002 and 0004 are entangled: they are three views of the same choice to let the service mediate key access rather than derive keys from a user secret. Revisiting any one of them means revisiting all three.
 

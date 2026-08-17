@@ -36,3 +36,4 @@ include(":core-crypto-android")
 include(":core-auth")
 
 include(":feature-lock")
+include(":core-api")

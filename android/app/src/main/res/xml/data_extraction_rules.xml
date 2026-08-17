@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing leaves this device through backup or transfer.
+
+  allowBackup="false" already covers the classic path, but cloud backup and
+  device-to-device transfer are separate channels with separate rules, and a
+  wrapped DEK or a Keystore-backed refresh token arriving on another device is
+  the failure this prevents.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>

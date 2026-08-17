@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      No DayNight parent. The app is one colour scheme by design (see
+      docs/design-language.md); a light variant would hand the sealed material
+      a background it does not read against.
+    -->
+    <style name="Theme.Cryptum" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:statusBarColor">@color/ground</item>
+        <item name="android:navigationBarColor">@color/ground</item>
+    </style>
+</resources>

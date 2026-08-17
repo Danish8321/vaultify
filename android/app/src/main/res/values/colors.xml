@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches Seal.Ground. The window paints before Compose does, and a white
+         flash on launch would be the one frame the design does not control. -->
+    <color name="ground">#FF0B0C0E</color>
+</resources>

@@ -31,7 +31,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cryptum.lock.Seal
-import com.cryptum.lock.SecureScreen
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -155,10 +154,6 @@ private fun ComposeSecret(onCancel: () -> Unit, onSave: (String, SecretPayload) 
     var url by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
 
-    // Anything typed here is plaintext on screen, so the window is protected
-    // for as long as this composable lives.
-    SecureScreen()
-
     Column(Modifier.fillMaxSize().padding(horizontal = Seal.Gutter)) {
         Spacer(Modifier.height(56.dp))
         Header("N E W", onBack = onCancel)
@@ -202,8 +197,6 @@ private fun ComposeSecret(onCancel: () -> Unit, onSave: (String, SecretPayload) 
 @Composable
 private fun OpenedSecret(title: String, payload: SecretPayload, onClose: () -> Unit) {
     var revealed by remember { mutableStateOf(false) }
-
-    SecureScreen()
 
     Column(Modifier.fillMaxSize().padding(horizontal = Seal.Gutter)) {
         Spacer(Modifier.height(56.dp))

@@ -43,3 +43,7 @@ include(":core-api")
 // The Vault itself: the envelope that puts every non-title field into one
 // ciphertext, and the screens that show it.
 include(":feature-vault")
+
+// The only thing here that is installable. Everything above it is a library;
+// this is the Activity, the manifest and the wiring that make them an app.
+include(":app")

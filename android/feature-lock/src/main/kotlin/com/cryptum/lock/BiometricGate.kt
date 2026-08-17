@@ -1,12 +1,9 @@
 package com.cryptum.lock
 
-import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -85,21 +82,3 @@ fun ReLockOnBackground(lock: AppLock) {
     }
 }
 
-/**
- * Blocks screenshots and the recents-screen thumbnail for as long as this is
- * composed (security-requirements, task 2.13).
- *
- * Applied at the window, because that is the only level `FLAG_SECURE` exists
- * at — there is no per-composable equivalent, and anything claiming to be one
- * is hiding pixels rather than preventing capture.
- */
-@Composable
-fun SecureScreen() {
-    val context = LocalContext.current
-
-    DisposableEffect(Unit) {
-        val window = (context as? ComponentActivity)?.window
-        window?.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-    }
-}

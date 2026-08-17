@@ -1,6 +1,6 @@
 # 18 — there is no :app module, so nothing is installable
 
-Status: open
+Status: resolved 2026-08-17 in commit bb7693a
 Severity: high
 Source: task 2.13
 
@@ -35,3 +35,18 @@ Add `android/app`: one Activity that hosts `LockGate` wrapping `VaultScreen`,
 wired to `ApiVaultRepository` and the Keystore token store. Then confirm
 FLAG_SECURE on a real Activity rather than a test host, since that is the
 claim currently resting on the weakest evidence.
+
+## Resolved
+
+`android/app` exists: one FragmentActivity composing `LockGate` around
+`VaultScreen`, backup and device-transfer excluded at the root, and FLAG_SECURE
+set on the window rather than per screen — which also let `SecureScreen` and its
+LocalContext-to-Activity cast be deleted.
+
+The FLAG_SECURE claim now rests on an assertion against the real window, proven
+non-vacuous by deleting the setFlags call and watching the test fail. That was
+the weakest evidence in the project and is now among the strongest.
+
+Still true: the app throws on unlock, deliberately, because sign-in (14) and a
+deployed environment (06) are both missing. 2.14 remains blocked on those, not
+on this.

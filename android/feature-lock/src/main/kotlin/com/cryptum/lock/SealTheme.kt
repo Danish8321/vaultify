@@ -8,11 +8,14 @@ import androidx.compose.ui.unit.sp
  * The visual vocabulary of the seal, from docs/design-language.md.
  *
  * Kept as plain values rather than a Material colour scheme on purpose. The
+ * Public because feature-vault renders the same material: two modules holding
+ * two copies of the same hex values is two places for them to drift apart.
+ *
  * design language forbids the stock look, and a `MaterialTheme` would supply
  * exactly that as the path of least resistance — surfaces, cards, elevation.
  * What this app needs is far smaller: two states, distinguishable by mass.
  */
-internal object Seal {
+object Seal {
 
     /** Behind everything. Near-black, not black: pure black hides the grain. */
     val Ground = Color(0xFF0B0C0E)

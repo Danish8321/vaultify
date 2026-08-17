@@ -36,4 +36,10 @@ include(":core-crypto-android")
 include(":core-auth")
 
 include(":feature-lock")
+// Generated from the API contract. contract.sh regenerates it and diffs the
+// result against what is committed, so the generated sources are tracked.
 include(":core-api")
+
+// The Vault itself: the envelope that puts every non-title field into one
+// ciphertext, and the screens that show it.
+include(":feature-vault")

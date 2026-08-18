@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
     <ProjectReference Include="..\Cryptum.TestSupport\Cryptum.TestSupport.csproj" />
     <ProjectReference Include="..\..\src\Cryptum.Data\Cryptum.Data.csproj" />
     <ProjectReference Include="..\..\src\Cryptum.Infrastructure\Cryptum.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Cryptum.Worker\Cryptum.Worker.csproj" />
   </ItemGroup>
 
 </Project>

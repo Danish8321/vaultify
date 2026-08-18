@@ -21,6 +21,13 @@ builder.Services.AddScoped<IAuditLog, AuditLog>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserProvisioning>();
 builder.Services.AddScoped<VaultService>();
+
+// The purge runs in Cryptum.Worker, not here — no API request triggers it. It is
+// registered in this host so the integration tests can exercise it against the
+// same database the endpoints use, which is the only place its batching and
+// resumability can actually be falsified.
+builder.Services.AddScoped<IPurgeStore, PurgeStore>();
+builder.Services.AddScoped<PurgeService>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Managed Identity only — no client secret exists to leak (ADR-0002).

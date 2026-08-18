@@ -239,6 +239,13 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Files:** `src/Cryptum.Worker/`
 - **Change:** Background purge of soft-deleted rows and orphaned blobs. Idempotent and resumable.
 - **Verify:** Test — interrupt mid-purge, re-run, and confirm completion with no double-delete errors.
+- **As built:** Done in f7eb5c8. `PurgeService` (domain) + `PurgeStore` (data) + a `PeriodicTimer`
+  loop in `Cryptum.Worker`. Batches commit individually, which is the whole of the resumability
+  design — no cursor, no reconciliation, and idempotence for free. Versions are deleted before
+  their Item so an interruption never orphans version rows. Verified by 5 integration tests
+  against real SQLite, including the plan's stated interrupt-and-resume case; mutation-checked by
+  widening the batch, which fails that test. **Blob purge is not included** — there are no blobs
+  until 3.1, which ticket 06 blocks. The worker's own timer loop is untested: ticket 21.
 
 ### 4.3 Resolve the Key Vault retention question
 - **Files:** `docs/adr/0003-crypto-shred-deletion.md`

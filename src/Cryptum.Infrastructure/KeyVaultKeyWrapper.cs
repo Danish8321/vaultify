@@ -95,10 +95,18 @@ public sealed class KeyVaultKeyWrapper(KeyClient keyClient, TokenCredential cred
         {
             var operation = await keyClient.StartDeleteKeyAsync(KekName(owner), cancellationToken).ConfigureAwait(false);
             await operation.WaitForCompletionAsync(cancellationToken).ConfigureAwait(false);
+
+            // Delete alone only moves the key into the 7-day soft-delete window, where
+            // an Azure admin can still recover it — so delete alone leaves the user's
+            // data readable by someone, which is not what the account-deletion screen
+            // said. The purge is what makes ADR-0003's promise literally true, and it
+            // is why that ADR requires purge protection to stay off.
+            await keyClient.PurgeDeletedKeyAsync(KekName(owner), cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
-            // Already shredded. Deletion is idempotent so a retried purge does not fail.
+            // Already shredded, or already purged. Both are the desired end state, and
+            // deletion has to be idempotent because the worker retries it.
         }
     }
 

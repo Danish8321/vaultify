@@ -25,7 +25,7 @@ jobs:
       # 17 matches the jvmToolchain the Gradle build declares; letting the
       # runner's default JDK decide would make the gate pass or fail on
       # something no file in this repo controls.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'

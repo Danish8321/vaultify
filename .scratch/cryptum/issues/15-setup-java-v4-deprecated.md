@@ -1,6 +1,6 @@
 # 15 — CI warns that actions/setup-java@v4 is deprecated
 
-Status: open
+Status: closed
 Severity: low
 Source: CI run for commit 10c61f9
 
@@ -23,5 +23,5 @@ prove the bump, which is the whole content of the change.
 
 ## Resolution
 
-Bump to `actions/setup-java@v5`, push, confirm the Android JVM tests still run
-under it. Small enough to fold into the next Android commit that touches CI.
+Bumped to `actions/setup-java@v5` in commit 7d7d558, pushed, CI run
+32487537024 green — Android JVM tests still run under it.

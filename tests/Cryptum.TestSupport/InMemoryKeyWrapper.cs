@@ -16,9 +16,29 @@ namespace Cryptum.TestSupport;
 public sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
 {
     private readonly ConcurrentDictionary<UserId, RSA> keks = new();
+    private readonly ConcurrentDictionary<UserId, RSA> softDeletedKeks = new();
     private readonly ConcurrentDictionary<UserId, int> kekCreations = new();
 
     public int UnwrapCount { get; private set; }
+
+    /// <summary>
+    /// True while the owner's KEK is soft-deleted but not yet purged — the
+    /// window in which a real Key Vault admin could still recover it (ADR-0003,
+    /// ticket 22). Lets a test tell "delete only" from "delete and purge" without
+    /// live Azure, which a fake that removes the key in one step cannot.
+    /// </summary>
+    public bool IsRecoverable(UserId owner) => softDeletedKeks.ContainsKey(owner);
+
+    /// <summary>Soft-deletes the KEK without purging it — the incomplete shred ticket 22 found in production.</summary>
+    public Task DeleteWithoutPurgeAsync(UserId owner, CancellationToken cancellationToken = default)
+    {
+        if (keks.TryRemove(owner, out var kek))
+        {
+            softDeletedKeks[owner] = kek;
+        }
+
+        return Task.CompletedTask;
+    }
 
     /// <summary>How many distinct KEKs this wrapper has created for the owner.</summary>
     /// <remarks>
@@ -78,9 +98,16 @@ public sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
 
     public Task CryptoShredAsync(UserId owner, CancellationToken cancellationToken = default)
     {
+        // Mirrors KeyVaultKeyWrapper.CryptoShredAsync: delete moves the key into
+        // the soft-delete window, purge is the step that makes it unrecoverable.
         if (keks.TryRemove(owner, out var kek))
         {
-            kek.Dispose();
+            softDeletedKeks[owner] = kek;
+        }
+
+        if (softDeletedKeks.TryRemove(owner, out var deleted))
+        {
+            deleted.Dispose();
         }
 
         return Task.CompletedTask;
@@ -93,6 +120,12 @@ public sealed class InMemoryKeyWrapper : IKeyWrapper, IDisposable
             kek.Dispose();
         }
 
+        foreach (var kek in softDeletedKeks.Values)
+        {
+            kek.Dispose();
+        }
+
         keks.Clear();
+        softDeletedKeks.Clear();
     }
 }

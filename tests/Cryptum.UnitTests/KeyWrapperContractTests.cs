@@ -93,6 +93,22 @@ public sealed class KeyWrapperContractTests
     }
 
     [Fact]
+    public async Task Crypto_shred_purges_so_the_kek_is_not_merely_recoverable()
+    {
+        // Ticket 22: delete alone leaves a 7-day window where the KEK is
+        // recoverable. CryptoShredAsync must purge, not just delete.
+        using var wrapper = new InMemoryKeyWrapper();
+        var owner = new UserId(Guid.CreateVersion7());
+        await wrapper.EnsureKekAsync(owner);
+
+        await wrapper.DeleteWithoutPurgeAsync(owner);
+        Assert.True(wrapper.IsRecoverable(owner), "soft-delete window should still be representable");
+
+        await wrapper.CryptoShredAsync(owner);
+        Assert.False(wrapper.IsRecoverable(owner), "crypto-shred must purge, not just delete");
+    }
+
+    [Fact]
     public async Task Wrapping_the_same_dek_twice_yields_different_ciphertext()
     {
         // RSA-OAEP is randomized. Deterministic output would let an observer

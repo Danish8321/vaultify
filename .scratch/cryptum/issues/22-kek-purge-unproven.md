@@ -1,6 +1,6 @@
 # 22 — Crypto-shred deleted the KEK but never purged it
 
-**Status:** code fixed, verification blocked
+**Status:** code fixed; soft-delete window now representable in `InMemoryKeyWrapper` and covered by `Crypto_shred_purges_so_the_kek_is_not_merely_recoverable`. Live Key Vault contract test still blocked on ticket 06.
 **Severity:** high
 **Found:** 2026-08-18, reviewing plan task 4.3
 

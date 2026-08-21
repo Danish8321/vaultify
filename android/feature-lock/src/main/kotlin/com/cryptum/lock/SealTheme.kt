@@ -45,4 +45,7 @@ object Seal {
 
     val Gutter = 28.dp
     val HoldToOpenMillis = 600
+
+    /** Sealing/opening cross-fade. Design language: 200-300ms, eased. */
+    val SealTransitionMillis = 260
 }

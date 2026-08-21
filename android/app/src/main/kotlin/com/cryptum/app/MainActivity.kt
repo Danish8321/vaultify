@@ -3,6 +3,8 @@ package com.cryptum.app
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,8 +13,27 @@ import androidx.fragment.app.FragmentActivity
 import com.cryptum.lock.AppLock
 import com.cryptum.lock.LockGate
 import com.cryptum.lock.ReLockOnBackground
+import com.cryptum.lock.Seal
 import com.cryptum.lock.promptToUnlock
 import com.cryptum.vault.VaultScreen
+
+/**
+ * The colour scheme exists only so stock Material components (ripple,
+ * text-field chrome) stop falling back to M3's own light defaults — every
+ * value here is a Seal colour, never a new one. Shape and typography are left
+ * at M3 default because nothing in this app uses either.
+ */
+private val CryptumColorScheme = darkColorScheme(
+    primary = Seal.Open,
+    onPrimary = Seal.Ground,
+    background = Seal.Ground,
+    onBackground = Seal.Ink,
+    surface = Seal.Mass,
+    onSurface = Seal.Ink,
+    surfaceVariant = Seal.Grain,
+    onSurfaceVariant = Seal.InkDim,
+    outline = Seal.InkDim,
+)
 
 /**
  * The whole app. One Activity, one window, two states.
@@ -36,22 +57,24 @@ class MainActivity : FragmentActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
 
         setContent {
-            val lock = remember { AppLock() }
-            var locked by remember { mutableStateOf(true) }
+            MaterialTheme(colorScheme = CryptumColorScheme) {
+                val lock = remember { AppLock() }
+                var locked by remember { mutableStateOf(true) }
 
-            remember(lock) { lock.onLockStateChanged { locked = it } }
+                remember(lock) { lock.onLockStateChanged { locked = it } }
 
-            ReLockOnBackground(lock)
+                ReLockOnBackground(lock)
 
-            LockGate(
-                isLocked = locked,
-                onUnlockRequested = { promptToUnlock(this, lock, mainExecutor) },
-            ) {
-                // Constructed inside the unlocked branch on purpose: while the
-                // Vault is sealed there is no repository, so there is nothing
-                // holding a connection or a token in memory behind the seal.
-                val repository = remember { Repositories.forSignedInUser() }
-                VaultScreen(repository)
+                LockGate(
+                    isLocked = locked,
+                    onUnlockRequested = { promptToUnlock(this, lock, mainExecutor) },
+                ) {
+                    // Constructed inside the unlocked branch on purpose: while the
+                    // Vault is sealed there is no repository, so there is nothing
+                    // holding a connection or a token in memory behind the seal.
+                    val repository = remember { Repositories.forSignedInUser() }
+                    VaultScreen(repository)
+                }
             }
         }
     }

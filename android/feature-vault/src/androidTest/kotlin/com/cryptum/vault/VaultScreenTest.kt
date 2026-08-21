@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -50,8 +51,9 @@ class VaultScreenTest {
         compose.onNodeWithText("Email").assertExists()
         compose.onNodeWithText(secret).assertDoesNotExist()
 
-        compose.onNodeWithText("Email").performClick()
-        compose.onNodeWithTag(TAG_REVEAL).performClick()
+        compose.onNodeWithText("Email").performHold()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TAG_REVEAL).performHold()
         compose.onNodeWithText(secret).assertExists()
     }
 
@@ -78,8 +80,9 @@ class VaultScreenTest {
         compose.onNodeWithTag(TAG_FIELD_TITLE).performTextInput("Email")
         compose.onNodeWithTag(TAG_FIELD_PASSWORD).performTextInput(secret)
         compose.onNodeWithTag(TAG_SAVE).performClick()
-        compose.onNodeWithText("Email").performClick()
-        compose.onNodeWithTag(TAG_REVEAL).performClick()
+        compose.onNodeWithText("Email").performHold()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TAG_REVEAL).performHold()
         compose.onNodeWithText(secret).assertExists()
         compose.waitForIdle()
 
@@ -114,7 +117,7 @@ class VaultScreenTest {
         compose.waitForIdle()
         capture("vault-list.png")
 
-        compose.onNodeWithText("Email").performClick()
+        compose.onNodeWithText("Email").performHold()
         compose.waitForIdle()
         capture("vault-opened.png")
     }
@@ -169,6 +172,26 @@ private class SealedFakeRepository : VaultRepository {
 
     fun storedBytesContain(text: String): Boolean =
         rows.values.any { (it.ciphertext + it.nonce).containsBytesOf(text) }
+}
+
+/**
+ * The design language requires a sustained press to open or reveal, never a
+ * tap, so tests drive the same gesture a real thumb would rather than
+ * [androidx.compose.ui.test.performClick]. The hold is gated by a real
+ * [kotlinx.coroutines.delay] in [com.cryptum.lock.Seal.HoldToOpenMillis], not
+ * by Compose's frame clock, so this sleeps the test thread for real rather
+ * than advancing an injected event timestamp — `advanceEventTime` alone
+ * delivers down/up back-to-back with no actual elapsed time for the delay to
+ * observe.
+ */
+private fun androidx.compose.ui.test.SemanticsNodeInteraction.performHold() {
+    performTouchInput { down(center) }
+    Thread.sleep(com.cryptum.lock.Seal.HoldToOpenMillis.toLong() + 250)
+    // The hold firing usually replaces this node's content (the row becomes
+    // "opened", the reveal prompt becomes the plaintext) before the release
+    // is injected, so the up() target may already be gone — that is success,
+    // not a failure to clean up after.
+    runCatching { performTouchInput { up() } }
 }
 
 private fun ByteArray.containsBytesOf(text: String): Boolean {

@@ -1,11 +1,18 @@
 package com.cryptum.vault
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,14 +32,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cryptum.lock.Seal
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 const val TAG_NEW_SECRET = "new-secret"
 const val TAG_FIELD_TITLE = "field-title"
@@ -43,6 +51,14 @@ const val TAG_FIELD_NOTES = "field-notes"
 const val TAG_SAVE = "save"
 const val TAG_REVEAL = "reveal"
 const val TAG_BACK = "back"
+
+/** The one thing on screen at a time. Replaces two nullable/boolean flags so
+ * the seal/open transition below has a single, stable key to animate on. */
+private sealed interface Screen {
+    data object List : Screen
+    data object Compose : Screen
+    data class Open(val title: String, val payload: SecretPayload) : Screen
+}
 
 /**
  * The Vault: a list of sealed things, one of which can be open at a time.
@@ -56,8 +72,7 @@ const val TAG_BACK = "back"
 @Composable
 fun VaultScreen(repository: VaultRepository, modifier: Modifier = Modifier) {
     var summaries by remember { mutableStateOf(emptyList<SecretSummary>()) }
-    var composing by remember { mutableStateOf(false) }
-    var opened by remember { mutableStateOf<Pair<String, SecretPayload>?>(null) }
+    var screen by remember { mutableStateOf<Screen>(Screen.List) }
     val scope = rememberCoroutineScope()
 
     suspend fun refresh() {
@@ -67,32 +82,111 @@ fun VaultScreen(repository: VaultRepository, modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { refresh() }
 
     Box(modifier.fillMaxSize().background(Seal.Ground)) {
-        val open = opened
-        when {
-            composing -> ComposeSecret(
-                onCancel = { composing = false },
-                onSave = { title, payload ->
-                    scope.launch {
-                        repository.create(title, payload)
-                        composing = false
-                        refresh()
-                    }
+        // Sealing/opening is the only motion with real weight (design
+        // language: 200-300ms, eased). Everything else in this screen is
+        // instant.
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = {
+                fadeIn(tween(Seal.SealTransitionMillis)) togetherWith
+                    fadeOut(tween(Seal.SealTransitionMillis))
+            },
+            label = "vault-seal-state",
+        ) { state ->
+            when (state) {
+                is Screen.Compose -> ComposeSecret(
+                    onCancel = { screen = Screen.List },
+                    onSave = { title, payload ->
+                        scope.launch {
+                            repository.create(title, payload)
+                            screen = Screen.List
+                            refresh()
+                        }
+                    },
+                )
+
+                is Screen.Open -> OpenedSecret(title = state.title, payload = state.payload) {
+                    // Dropping the reference is the closing action. There is
+                    // no "keep it around in case they come back" cache:
+                    // coming back costs one unwrap, and holding a plaintext
+                    // costs a heap dump.
+                    screen = Screen.List
+                }
+
+                Screen.List -> SecretList(
+                    summaries = summaries,
+                    onNew = { screen = Screen.Compose },
+                    onOpen = { summary ->
+                        scope.launch { screen = Screen.Open(summary.title, repository.read(summary.id)) }
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Wraps [content] with the press-and-hold gesture the design language
+ * requires for every reveal: a tap is reversible by accident, a hold is
+ * deliberate. [onActivated] fires once, after a sustained press of
+ * [Seal.HoldToOpenMillis]; releasing early cancels with no penalty.
+ */
+@Composable
+private fun HoldToOpen(
+    modifier: Modifier = Modifier,
+    onActivated: () -> Unit,
+    content: @Composable (progress: Float) -> Unit,
+) {
+    var holding by remember { mutableStateOf(false) }
+    var fired by remember { mutableStateOf(false) }
+
+    val progress by animateFloatAsState(
+        targetValue = if (holding) 1f else 0f,
+        animationSpec = tween(durationMillis = if (holding) Seal.HoldToOpenMillis else 140),
+        label = "hold-to-open",
+    )
+
+    LaunchedEffect(holding) {
+        if (holding) {
+            delay(Seal.HoldToOpenMillis.toLong())
+            if (!fired) {
+                fired = true
+                onActivated()
+            }
+        } else {
+            fired = false
+        }
+    }
+
+    Box(
+        modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    holding = true
+                    tryAwaitRelease()
+                    holding = false
                 },
             )
+        },
+    ) {
+        content(progress)
 
-            open != null -> OpenedSecret(title = open.first, payload = open.second) {
-                // Dropping the reference is the closing action. There is no
-                // "keep it around in case they come back" cache: coming back
-                // costs one unwrap, and holding a plaintext costs a heap dump.
-                opened = null
-            }
-
-            else -> SecretList(
-                summaries = summaries,
-                onNew = { composing = true },
-                onOpen = { summary ->
-                    scope.launch { opened = summary.title to repository.read(summary.id) }
-                },
+        // The hold's only visible progress: the accent grows in from the
+        // leading edge and reaches full width exactly as the hold fires.
+        if (progress > 0f) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .background(Seal.Open.copy(alpha = 0.12f)),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth(progress)
+                    .height(2.dp)
+                    .background(Seal.Open),
             )
         }
     }
@@ -116,16 +210,19 @@ private fun SecretList(
         // across the whole app rather than a different metaphor per screen.
         LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
             items(summaries, key = { it.id }) { summary ->
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .background(Seal.Mass)
-                        .clickable { onOpen(summary) }
-                        .padding(horizontal = 18.dp),
-                    contentAlignment = Alignment.CenterStart,
+                HoldToOpen(
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    onActivated = { onOpen(summary) },
                 ) {
-                    Text(summary.title, color = Seal.Ink, fontSize = 16.sp)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Seal.Mass)
+                            .padding(horizontal = 18.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Text(summary.title, color = Seal.Ink, fontSize = 16.sp)
+                    }
                 }
             }
         }
@@ -136,7 +233,7 @@ private fun SecretList(
                 .height(56.dp)
                 .testTag(TAG_NEW_SECRET)
                 .background(Seal.Grain)
-                .clickable(onClick = onNew),
+                .pointerInput(Unit) { detectTapGestures(onTap = { onNew() }) },
             contentAlignment = Alignment.Center,
         ) {
             Text("seal something new", color = Seal.Ink, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
@@ -167,29 +264,36 @@ private fun ComposeSecret(onCancel: () -> Unit, onSave: (String, SecretPayload) 
 
         Spacer(Modifier.height(24.dp))
 
+        // Grain, not the accent: the accent is spent only on the open state
+        // and destructive confirmation (design language), and saving a new
+        // Secret is neither.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .testTag(TAG_SAVE)
-                .background(Seal.Open)
-                .clickable {
-                    // Blank is not the same as absent. An empty box means the
-                    // user left the field alone, so it does not go into the
-                    // payload at all.
-                    onSave(
-                        title,
-                        SecretPayload(
-                            username = username.ifBlank { null },
-                            password = password.ifBlank { null },
-                            url = url.ifBlank { null },
-                            notes = notes.ifBlank { null },
-                        ),
+                .background(Seal.Grain)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            // Blank is not the same as absent. An empty box means the
+                            // user left the field alone, so it does not go into the
+                            // payload at all.
+                            onSave(
+                                title,
+                                SecretPayload(
+                                    username = username.ifBlank { null },
+                                    password = password.ifBlank { null },
+                                    url = url.ifBlank { null },
+                                    notes = notes.ifBlank { null },
+                                ),
+                            )
+                        },
                     )
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Text("seal", color = Seal.Ground, fontFamily = FontFamily.Monospace, fontSize = 15.sp)
+            Text("seal", color = Seal.Ink, fontFamily = FontFamily.Monospace, fontSize = 15.sp)
         }
     }
 }
@@ -209,25 +313,26 @@ private fun OpenedSecret(title: String, payload: SecretPayload, onClose: () -> U
             if (revealed) {
                 OpenField("password", secret)
             } else {
-                // Opening the envelope and showing the password are two
-                // separate acts. Someone standing behind the user sees the
-                // Secret exists, not what it is.
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .testTag(TAG_REVEAL)
-                        .background(Seal.Mass)
-                        .clickable { revealed = true },
-                    contentAlignment = Alignment.CenterStart,
+                // Opening the envelope and revealing the password are two
+                // separate acts, and both take the same hold gesture: someone
+                // standing behind the user sees the Secret exists, not what
+                // it is, and cannot trigger a reveal with a stray tap.
+                HoldToOpen(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    onActivated = { revealed = true },
                 ) {
-                    Text(
-                        "password  ·  tap to reveal",
-                        color = Seal.InkDim,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                    )
+                    Box(
+                        Modifier.fillMaxSize().background(Seal.Mass),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Text(
+                            "password  ·  hold to reveal",
+                            color = Seal.InkDim,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(horizontal = 18.dp).testTag(TAG_REVEAL),
+                        )
+                    }
                 }
             }
         }
@@ -241,7 +346,9 @@ private fun OpenedSecret(title: String, payload: SecretPayload, onClose: () -> U
 private fun Header(text: String, onBack: () -> Unit) {
     Column {
         Box(
-            Modifier.testTag(TAG_BACK).clickable(onClick = onBack),
+            Modifier
+                .testTag(TAG_BACK)
+                .pointerInput(Unit) { detectTapGestures(onTap = { onBack() }) },
         ) {
             Text("← close", color = Seal.InkDim, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
@@ -285,4 +392,3 @@ private fun VaultField(
         modifier = Modifier.fillMaxWidth().testTag(tag).padding(bottom = 8.dp),
     )
 }
-

@@ -1,8 +1,18 @@
 # 20 — :app instrumentation crashed twice, unexplained
 
-Status: open
+Status: open, not reproduced
 Severity: medium
 Source: task 2.13 follow-up, building the :app module
+
+## 2026-08-18 rerun
+
+Cleared logcat, ran `:app:connectedAndroidTest --rerun-tasks` on RZ8R20CRB9T
+(physical device, not CI emulator). BUILD SUCCESSFUL, 2/2 tests passed.
+`adb logcat -d | grep com.cryptum | grep -iE "FATAL|AndroidRuntime|crash|died"`
+returned nothing for the app process. No recurrence — leaving open per the
+ticket's own instruction: absence of one crash on a different device doesn't
+clear an intermittent CI-emulator failure. Next CI recurrence should still
+capture logcat before touching the test.
 
 ## Problem
 

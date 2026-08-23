@@ -4,8 +4,11 @@ import com.cryptum.api.ItemsApi
 import com.cryptum.api.model.CreateSecretRequest
 import java.util.UUID
 
-/** One row of the list. Title only — reading it costs no DEK unwrap (ADR-0002). */
-data class SecretSummary(val id: UUID, val title: String)
+/**
+ * One row of the list. Title (plus a non-secret [hint] line, e.g. the item's
+ * kind) only — reading it costs no DEK unwrap (ADR-0002).
+ */
+data class SecretSummary(val id: UUID, val title: String, val hint: String)
 
 /**
  * What the screens are allowed to know about the server.
@@ -33,7 +36,7 @@ interface VaultRepository {
 class ApiVaultRepository(private val api: ItemsApi) : VaultRepository {
 
     override suspend fun list(): List<SecretSummary> =
-        api.listItems().body().map { SecretSummary(id = it.id, title = it.title) }
+        api.listItems().body().map { SecretSummary(id = it.id, title = it.title, hint = it.kind) }
 
     override suspend fun create(title: String, payload: SecretPayload): UUID {
         val request: CreateSecretRequest = SecretEnvelope.seal(title, payload)

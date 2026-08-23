@@ -156,7 +156,7 @@ private class SealedFakeRepository : VaultRepository {
     private val rows = LinkedHashMap<UUID, Row>()
 
     override suspend fun list(): List<SecretSummary> =
-        rows.map { (id, row) -> SecretSummary(id, row.title) }
+        rows.map { (id, row) -> SecretSummary(id, row.title, hint = "") }
 
     override suspend fun create(title: String, payload: SecretPayload): UUID {
         val request = SecretEnvelope.seal(title, payload)

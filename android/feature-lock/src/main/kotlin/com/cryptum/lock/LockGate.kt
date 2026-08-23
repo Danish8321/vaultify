@@ -3,6 +3,7 @@ package com.cryptum.lock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,11 +64,61 @@ fun LockGate(
 /**
  * The locked state, rendered as mass rather than as a dialog over a blur.
  *
- * There is no keypad, no logo lockup and no illustration. The screen says one
- * thing — the Vault is closed — and offers one action.
+ * Offers two ways in, one at a time: the biometric hold gesture (the sole
+ * affordance until this task) and a PIN grid. There is still no keypad
+ * shown by default, no logo lockup competing with the wordmark and no
+ * illustration — switching modes is a deliberate, explicit choice via the
+ * toggle line, not two controls fighting for attention at once.
  */
 @Composable
 internal fun SealScreen(onUnlockRequested: () -> Unit) {
+    var pinMode by remember { mutableStateOf(false) }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .testTag(TAG_SEAL)
+            .padding(horizontal = Seal.Gutter),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "C R Y P T U M",
+            color = Seal.InkDim,
+            fontSize = Seal.TitleSize,
+            letterSpacing = Seal.TitleTracking,
+            fontWeight = FontWeight.Medium,
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        if (pinMode) {
+            PinSeal(onUnlockRequested = onUnlockRequested)
+        } else {
+            BiometricSeal(onUnlockRequested = onUnlockRequested)
+        }
+
+        Spacer(Modifier.height(36.dp))
+
+        // Both modes stay reachable from the other — locking a user into
+        // whichever affordance failed once would be its own kind of lockout.
+        Text(
+            text = if (pinMode) "Use fingerprint instead" else "Use PIN instead",
+            color = Seal.InkDim,
+            fontSize = Seal.CaptionSize,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.clickable { pinMode = !pinMode },
+        )
+    }
+}
+
+/**
+ * The existing hold-to-open biometric affordance, restyled to the current
+ * token set. Interaction model unchanged: opening is a sustained gesture,
+ * never a tap, so revealing the vault in public is never one accidental
+ * touch away.
+ */
+@Composable
+internal fun BiometricSeal(onUnlockRequested: () -> Unit) {
     var holding by remember { mutableStateOf(false) }
     var fired by remember { mutableStateOf(false) }
 
@@ -77,8 +128,6 @@ internal fun SealScreen(onUnlockRequested: () -> Unit) {
         label = "hold",
     )
 
-    // Opening is a sustained gesture, never a tap: a tap is reversible by
-    // accident, and revealing a vault in public should not be.
     LaunchedEffect(holding) {
         if (holding) {
             delay(Seal.HoldToOpenMillis.toLong())
@@ -92,31 +141,16 @@ internal fun SealScreen(onUnlockRequested: () -> Unit) {
     }
 
     Column(
-        Modifier
-            .fillMaxSize()
-            .testTag(TAG_SEAL)
-            .padding(horizontal = Seal.Gutter)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        holding = true
-                        tryAwaitRelease()
-                        holding = false
-                    },
-                )
-            },
-        verticalArrangement = Arrangement.Center,
+        Modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    holding = true
+                    tryAwaitRelease()
+                    holding = false
+                },
+            )
+        },
     ) {
-        Text(
-            text = "C R Y P T U M",
-            color = Seal.InkDim,
-            fontSize = Seal.TitleSize,
-            letterSpacing = Seal.TitleTracking,
-            fontWeight = FontWeight.Medium,
-        )
-
-        Spacer(Modifier.height(20.dp))
-
         // The mass. Grain rather than a flat fill so the sealed state is
         // legible without relying on colour.
         SealMass(
@@ -144,13 +178,51 @@ internal fun SealScreen(onUnlockRequested: () -> Unit) {
             textAlign = TextAlign.Start,
         )
 
-        Spacer(Modifier.height(36.dp))
+        Spacer(Modifier.height(20.dp))
 
         Text(
             text = "press and hold",
             color = Seal.InkDim,
             fontSize = Seal.CaptionSize,
             fontFamily = FontFamily.Monospace,
+        )
+    }
+}
+
+/**
+ * The PIN affordance: a 6-slot dot row above a digit grid.
+ *
+ * Entering the sixth digit is the equivalent of the biometric hold firing
+ * at the end of its gesture — a single, unambiguous completion point,
+ * not a submit button competing with the grid for space.
+ */
+@Composable
+internal fun PinSeal(onUnlockRequested: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+
+    LaunchedEffect(pin) {
+        if (pin.length == PIN_LENGTH) {
+            onUnlockRequested()
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        PinDots(length = pin.length)
+
+        Spacer(Modifier.height(28.dp))
+
+        PinPad(
+            onDigit = { digit -> if (pin.length < PIN_LENGTH) pin += digit },
+            onBackspace = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Text(
+            text = "keys unavailable until you authenticate",
+            color = Seal.InkDim,
+            fontSize = Seal.CaptionSize,
+            textAlign = TextAlign.Start,
         )
     }
 }

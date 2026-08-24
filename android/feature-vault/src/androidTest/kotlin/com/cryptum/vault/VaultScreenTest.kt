@@ -213,6 +213,22 @@ class VaultScreenTest {
         capture("vault-opened.png")
     }
 
+    @Test
+    fun capture_the_files_tab() {
+        // Not an assertion — a rendering, so the new Files tab can be
+        // reviewed as pixels rather than as a description.
+        val repository = SealedFakeRepository()
+
+        compose.setContent { VaultScreen(repository) }
+        compose.onNodeWithTag(TAG_TAB_FILES).performClick()
+        compose.waitForIdle()
+        capture("files-list.png")
+
+        compose.onNodeWithTag(TAG_NEW_FILE).performClick()
+        compose.waitForIdle()
+        capture("files-add-sheet.png")
+    }
+
     private fun capture(name: String) {
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val dir = File(

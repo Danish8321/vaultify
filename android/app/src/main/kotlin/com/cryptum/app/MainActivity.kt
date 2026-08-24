@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import com.cryptum.lock.AppLock
 import com.cryptum.lock.LockGate
+import com.cryptum.lock.OnboardingScreen
 import com.cryptum.lock.ReLockOnBackground
 import com.cryptum.lock.Seal
 import com.cryptum.lock.promptToUnlock
@@ -62,20 +63,28 @@ class MainActivity : FragmentActivity() {
             MaterialTheme(colorScheme = CryptumColorScheme) {
                 val lock = remember { AppLock() }
                 var locked by remember { mutableStateOf(true) }
+                // In-memory only — no settings-persistence layer exists yet (the
+                // same gap SettingsScreen already lives with), so onboarding
+                // replays every fresh process rather than only on a real first run.
+                var onboarded by remember { mutableStateOf(false) }
 
                 SideEffect { lock.onLockStateChanged { locked = it } }
 
                 ReLockOnBackground(lock)
 
-                LockGate(
-                    isLocked = locked,
-                    onUnlockRequested = { promptToUnlock(this, lock, ContextCompat.getMainExecutor(this)) },
-                ) {
-                    // Constructed inside the unlocked branch on purpose: while the
-                    // Vault is sealed there is no repository, so there is nothing
-                    // holding a connection or a token in memory behind the seal.
-                    val repository = remember { Repositories.forSignedInUser() }
-                    VaultScreen(repository, onAccountDeleted = { lock.onAccountDeleted() })
+                if (!onboarded) {
+                    OnboardingScreen(onFinished = { onboarded = true })
+                } else {
+                    LockGate(
+                        isLocked = locked,
+                        onUnlockRequested = { promptToUnlock(this, lock, ContextCompat.getMainExecutor(this)) },
+                    ) {
+                        // Constructed inside the unlocked branch on purpose: while the
+                        // Vault is sealed there is no repository, so there is nothing
+                        // holding a connection or a token in memory behind the seal.
+                        val repository = remember { Repositories.forSignedInUser() }
+                        VaultScreen(repository, onAccountDeleted = { lock.onAccountDeleted() })
+                    }
                 }
             }
         }

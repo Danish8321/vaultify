@@ -8,6 +8,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
@@ -67,6 +68,34 @@ class LockGateTest {
             requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")),
         )
         FileOutputStream(File(dir, "seal-screen.png")).use {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
+
+    @Test
+    fun capture_the_onboarding_screens() {
+        // Not an assertion — a rendering, so the new onboarding flow can be
+        // reviewed as pixels rather than as a description.
+        compose.setContent { OnboardingScreen(onFinished = {}) }
+        compose.waitForIdle()
+        captureRoot("onboard-slide-1.png")
+
+        compose.onNodeWithTag(TAG_ONBOARD_NEXT).performClick()
+        compose.onNodeWithTag(TAG_ONBOARD_NEXT).performClick()
+        compose.waitForIdle()
+        captureRoot("onboard-slide-3.png")
+
+        compose.onNodeWithTag(TAG_ONBOARD_NEXT).performClick()
+        compose.waitForIdle()
+        captureRoot("onboard-pin.png")
+    }
+
+    private fun captureRoot(name: String) {
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File(
+            requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")),
+        )
+        FileOutputStream(File(dir, name)).use {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
     }

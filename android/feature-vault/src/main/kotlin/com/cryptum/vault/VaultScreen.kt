@@ -70,13 +70,14 @@ const val TAG_EDIT = "edit"
 const val TAG_BACK = "back"
 const val TAG_SETTINGS = "settings"
 const val TAG_TAB_VAULT = "tab-vault"
+const val TAG_TAB_FILES = "tab-files"
 const val TAG_TAB_ACTIVITY = "tab-activity"
 const val TAG_TAB_SETTINGS = "tab-settings"
 
-/** Which of the three persistent tabs is showing. Independent of [Screen] —
+/** Which of the four persistent tabs is showing. Independent of [Screen] —
  * a tab stays selected underneath a pushed Detail/Compose/Delete screen, the
  * same way the prototype's bottom bar never disappears behind those. */
-private enum class Tab { Vault, Activity, Settings }
+private enum class Tab { Vault, Files, Activity, Settings }
 
 /** The one thing pushed over the tab content at a time. Replaces two
  * nullable/boolean flags so the seal/open transition below has a single,
@@ -200,6 +201,8 @@ fun VaultScreen(
                             },
                         )
 
+                        Tab.Files -> FilesScreen()
+
                         Tab.Activity -> ActivityScreen(entries = emptyList())
 
                         Tab.Settings -> SettingsScreen(
@@ -266,6 +269,9 @@ private fun BottomTabBar(tab: Tab, onTabSelected: (Tab) -> Unit) {
     ) {
         TabItem("Vault", TAG_TAB_VAULT, tab == Tab.Vault, { onTabSelected(Tab.Vault) }) { color ->
             ArchiveGlyph(color)
+        }
+        TabItem("Files", TAG_TAB_FILES, tab == Tab.Files, { onTabSelected(Tab.Files) }) { color ->
+            FileGlyph(color)
         }
         TabItem("Activity", TAG_TAB_ACTIVITY, tab == Tab.Activity, { onTabSelected(Tab.Activity) }) { color ->
             ClockGlyph(color)
@@ -782,6 +788,28 @@ private fun ArchiveGlyph(color: Color, modifier: Modifier = Modifier) {
         drawRoundRect(color, cornerRadius = CornerRadius(2.dp.toPx()), style = Stroke(width = 1.6.dp.toPx()))
         val lineY = size.height * 0.4f
         drawLine(color, androidx.compose.ui.geometry.Offset(0f, lineY), androidx.compose.ui.geometry.Offset(size.width, lineY), strokeWidth = 1.6.dp.toPx())
+    }
+}
+
+@Composable
+private fun FileGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.size(17.dp)) {
+        val dogEar = size.width * 0.42f
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(dogEar, 0f)
+            lineTo(size.width, size.height * 0.28f)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        drawPath(path, color = color, style = Stroke(width = 1.5.dp.toPx()))
+        val foldPath = Path().apply {
+            moveTo(dogEar, 0f)
+            lineTo(dogEar, size.height * 0.28f)
+            lineTo(size.width, size.height * 0.28f)
+        }
+        drawPath(foldPath, color = color, style = Stroke(width = 1.5.dp.toPx()))
     }
 }
 

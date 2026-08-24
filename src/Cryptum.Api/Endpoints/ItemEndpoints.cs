@@ -63,7 +63,96 @@ public static class ItemEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // Registered ahead of the read-item route so "files" is never captured
+        // by the {id:guid} pattern.
+        group.MapPost("/files", CreateFileAsync)
+            .WithName("CreateFile")
+            .Produces<CreateFileResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
+            .ProducesValidationProblem();
+
+        // Unwraps a DEK and issues a blob SAS, so it shares the stricter bucket.
+        group.MapGet("/files/{id:guid}", ReadFileAsync)
+            .WithName("ReadFile")
+            .Produces<FileResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .RequireRateLimiting(UnwrapPolicy);
+
         return app;
+    }
+
+    private static async Task<IResult> CreateFileAsync(
+        [FromBody] CreateFileRequest request,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (request.Nonce.Length != Item.NonceLength
+            || request.Dek.Length != CreateSecretRequest.MinDekBytes
+            || request.SizeBytes <= 0
+            || string.IsNullOrWhiteSpace(request.Title)
+            || request.Title.Length > Item.MaxTitleLength)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["request"] = ["Invalid request."],
+            });
+        }
+
+        try
+        {
+            var (item, uploadUri) = await vault.CreateFileAsync(
+                owner, request.Title, request.SizeBytes, request.Nonce, request.Dek, cancellationToken)
+                .ConfigureAwait(false);
+
+            return Results.Created(
+                $"/items/files/{item.Id.Value}",
+                new CreateFileResponse { Id = item.Id.Value, UploadUri = uploadUri });
+        }
+        catch (FileQuotaExceededException ex)
+        {
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status413PayloadTooLarge);
+        }
+    }
+
+    private static async Task<IResult> ReadFileAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result = await vault.ReadFileAsync(owner, new ItemId(id), cancellationToken).ConfigureAwait(false);
+
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        var (item, dek, downloadUri) = result.Value;
+
+        using (dek)
+        {
+            return Results.Ok(new FileResponse
+            {
+                Id = item.Id.Value,
+                Title = item.Title,
+                SizeBytes = item.SizeBytes ?? 0,
+                Nonce = item.Nonce,
+                Dek = dek.Span.ToArray(),
+                DownloadUri = downloadUri,
+                UpdatedAt = item.UpdatedAt,
+            });
+        }
     }
 
     private static async Task<IResult> CreateSecretAsync(

@@ -38,6 +38,8 @@ public sealed class CryptumApiFactory : WebApplicationFactory<Program>
 
     public InMemoryKeyWrapper KeyWrapper { get; } = new();
 
+    public FakeBlobStore BlobStore { get; } = new();
+
     /// <summary>Everything the host logged during the test.</summary>
     public CapturingLoggerProvider Logs { get; } = new();
 
@@ -59,6 +61,10 @@ public sealed class CryptumApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IKeyWrapper>();
             services.AddSingleton<IKeyWrapper>(KeyWrapper);
+
+            services.RemoveAll<IBlobStore>();
+            services.RemoveAll<Azure.Storage.Blobs.BlobServiceClient>();
+            services.AddSingleton<IBlobStore>(BlobStore);
 
             services.AddSingleton<ILoggerProvider>(Logs);
 

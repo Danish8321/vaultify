@@ -23,8 +23,11 @@
 
 package com.cryptum.api
 
+import com.cryptum.api.model.CreateFileRequest
+import com.cryptum.api.model.CreateFileResponse
 import com.cryptum.api.model.CreateSecretRequest
 import com.cryptum.api.model.CreatedItemResponse
+import com.cryptum.api.model.FileResponse
 import com.cryptum.api.model.HttpValidationProblemDetails
 import com.cryptum.api.model.ItemResponse
 import com.cryptum.api.model.ItemSummaryResponse
@@ -48,6 +51,39 @@ import io.ktor.http.ParametersBuilder
         httpClientEngine,
         httpClientConfig,
     ) {
+
+        /**
+        * POST /items/files
+        * 
+        * 
+         * @param createFileRequest  
+         * @return CreateFileResponse
+        */
+            @Suppress("UNCHECKED_CAST")
+        open suspend fun createFile(createFileRequest: CreateFileRequest): HttpResponse<CreateFileResponse> {
+
+            val localVariableAuthNames = listOf<String>()
+
+            val localVariableBody = createFileRequest
+
+            val localVariableQuery = mutableMapOf<String, List<String>>()
+
+            val localVariableHeaders = mutableMapOf<String, String>()
+
+            val localVariableConfig = RequestConfig<kotlin.Any?>(
+            RequestMethod.POST,
+            "/items/files",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            )
+
+            return jsonRequest(
+            localVariableConfig,
+            localVariableBody,
+            localVariableAuthNames
+            ).wrap()
+            }
 
         /**
         * POST /items
@@ -137,6 +173,40 @@ import io.ktor.http.ParametersBuilder
             val localVariableConfig = RequestConfig<kotlin.Any?>(
             RequestMethod.GET,
             "/items",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            )
+
+            return request(
+            localVariableConfig,
+            localVariableBody,
+            localVariableAuthNames
+            ).wrap()
+            }
+
+        /**
+        * GET /items/files/{id}
+        * 
+        * 
+         * @param id  
+         * @return FileResponse
+        */
+            @Suppress("UNCHECKED_CAST")
+        open suspend fun readFile(id: com.cryptum.api.SerializableUuid): HttpResponse<FileResponse> {
+
+            val localVariableAuthNames = listOf<String>()
+
+            val localVariableBody = 
+                    io.ktor.client.utils.EmptyContent
+
+            val localVariableQuery = mutableMapOf<String, List<String>>()
+
+            val localVariableHeaders = mutableMapOf<String, String>()
+
+            val localVariableConfig = RequestConfig<kotlin.Any?>(
+            RequestMethod.GET,
+            "/items/files/{id}".replace("{" + "id" + "}", "$id"),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

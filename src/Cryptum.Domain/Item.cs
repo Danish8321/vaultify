@@ -45,6 +45,18 @@ public sealed class Item
     /// <summary>Blob path for a File. Null for a Secret.</summary>
     public string? BlobPath { get; private set; }
 
+    /// <summary>
+    /// Ciphertext size in bytes for a File, as declared at registration and
+    /// confirmed against the actual blob once uploaded. Null for a Secret,
+    /// whose size lives implicitly in <see cref="Ciphertext"/>.
+    /// </summary>
+    /// <remarks>
+    /// The only per-file and per-User quota signal available (see
+    /// <see cref="FileLimits"/>): the server cannot content-inspect
+    /// ciphertext, so this recorded size is the sole control.
+    /// </remarks>
+    public long? SizeBytes { get; private set; }
+
     /// <summary>The Item's DEK, wrapped under the owner's KEK. Never stored unwrapped.</summary>
     public byte[] WrappedDek { get; private set; } = [];
 
@@ -95,6 +107,7 @@ public sealed class Item
         UserId owner,
         string title,
         string blobPath,
+        long sizeBytes,
         byte[] nonce,
         WrappedDek wrappedDek,
         DateTimeOffset now)
@@ -107,6 +120,11 @@ public sealed class Item
             throw new ArgumentException($"Blob path exceeds {MaxBlobPathLength} characters.", nameof(blobPath));
         }
 
+        if (sizeBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sizeBytes), "File size must be positive.");
+        }
+
         return new Item
         {
             Id = ItemId.New(),
@@ -114,6 +132,7 @@ public sealed class Item
             Kind = ItemKind.File,
             Title = title,
             BlobPath = blobPath,
+            SizeBytes = sizeBytes,
             Nonce = nonce,
             WrappedDek = wrappedDek.Value,
             KekVersion = wrappedDek.KekVersion,

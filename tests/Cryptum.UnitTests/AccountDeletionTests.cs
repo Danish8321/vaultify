@@ -40,7 +40,7 @@ public sealed class AccountDeletionTests : IDisposable
             new DbContextOptionsBuilder<CryptumDbContext>().UseSqlite(connection).Options);
         db.Database.EnsureCreated();
 
-        vault = new VaultService(new ItemRepository(db), keyWrapper, new AuditLog(db), new UserRepository(db), clock);
+        vault = new VaultService(new ItemRepository(db), keyWrapper, new FakeBlobStore(), new AuditLog(db), new UserRepository(db), clock);
 
         keyWrapper.EnsureKekAsync(alice).GetAwaiter().GetResult();
         keyWrapper.EnsureKekAsync(bob).GetAwaiter().GetResult();

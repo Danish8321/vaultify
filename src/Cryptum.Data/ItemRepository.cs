@@ -39,6 +39,12 @@ public sealed class ItemRepository(CryptumDbContext db) : IItemRepository
     public async Task AddAsync(Item item, CancellationToken cancellationToken = default) =>
         await db.Items.AddAsync(item, cancellationToken).ConfigureAwait(false);
 
+    public async Task<long> TotalFileBytesAsync(UserId owner, CancellationToken cancellationToken = default) =>
+        await db.Items
+            .Where(i => i.Owner == owner && i.Kind == ItemKind.File)
+            .SumAsync(i => i.SizeBytes ?? 0, cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 

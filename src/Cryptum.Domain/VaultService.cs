@@ -12,6 +12,7 @@ namespace Cryptum.Domain;
 public sealed class VaultService(
     IItemRepository items,
     IKeyWrapper keyWrapper,
+    IBlobStore blobStore,
     IAuditLog auditLog,
     IUserRepository users,
     TimeProvider clock)
@@ -38,6 +39,96 @@ public sealed class VaultService(
             AuditEntry.Record(owner, AuditAction.ItemCreated, now, item.Id), cancellationToken).ConfigureAwait(false);
 
         return item;
+    }
+
+    /// <summary>
+    /// Registers a File Item and returns it with an upload SAS for the caller to
+    /// PUT the ciphertext to directly — the server is never on the data path
+    /// (docs/IMPLEMENTATION-PLAN.md 3.1).
+    /// </summary>
+    /// <remarks>
+    /// The row is written before the client's upload happens, so a row can
+    /// exist with no blob behind it yet (an abandoned or failed upload). That
+    /// is an accepted, documented gap: the alternative — confirming the blob
+    /// first — would mean proxying the bytes through this service, which is
+    /// the exact thing 3.1 avoids. The blob path is never reused, so a retried
+    /// registration cannot orphan or overwrite a prior upload.
+    /// </remarks>
+    /// <exception cref="FileQuotaExceededException">
+    /// The file exceeds <see cref="FileLimits.MaxFileBytes"/>, or would push the
+    /// owner's total past <see cref="FileLimits.MaxUserQuotaBytes"/>.
+    /// </exception>
+    public async Task<(Item Item, Uri UploadSasUri)> CreateFileAsync(
+        UserId owner,
+        string title,
+        long sizeBytes,
+        byte[] nonce,
+        ReadOnlyMemory<byte> dek,
+        CancellationToken cancellationToken = default)
+    {
+        if (sizeBytes > FileLimits.MaxFileBytes)
+        {
+            throw new FileQuotaExceededException(
+                $"File is {sizeBytes} bytes, which exceeds the {FileLimits.MaxFileBytes}-byte per-file limit.");
+        }
+
+        var currentTotal = await items.TotalFileBytesAsync(owner, cancellationToken).ConfigureAwait(false);
+        if (currentTotal + sizeBytes > FileLimits.MaxUserQuotaBytes)
+        {
+            throw new FileQuotaExceededException(
+                $"Registering {sizeBytes} bytes would exceed the {FileLimits.MaxUserQuotaBytes}-byte account quota.");
+        }
+
+        var now = clock.GetUtcNow();
+        var blobPath = $"{owner.Value:N}/{ItemId.New().Value:N}";
+
+        var wrapped = await keyWrapper.WrapAsync(owner, dek, cancellationToken).ConfigureAwait(false);
+        await auditLog.RecordAsync(AuditEntry.Record(owner, AuditAction.DekWrapped, now), cancellationToken).ConfigureAwait(false);
+
+        var item = Item.CreateFile(owner, title, blobPath, sizeBytes, nonce, wrapped, now);
+
+        await items.AddAsync(item, cancellationToken).ConfigureAwait(false);
+        await items.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemCreated, now, item.Id), cancellationToken).ConfigureAwait(false);
+
+        var uploadUri = await blobStore.GetUploadSasUriAsync(blobPath, cancellationToken).ConfigureAwait(false);
+
+        return (item, uploadUri);
+    }
+
+    /// <summary>
+    /// Returns the File Item, its unwrapped DEK, and a download SAS, or null if
+    /// the caller does not own it. Same 404-not-403 shape as <see cref="ReadAsync"/>.
+    /// </summary>
+    public async Task<(Item Item, PlaintextDek Dek, Uri DownloadSasUri)?> ReadFileAsync(
+        UserId owner,
+        ItemId id,
+        CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var item = await items.FindAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        if (item is null || item.Kind != ItemKind.File || item.BlobPath is null)
+        {
+            await auditLog.RecordAsync(
+                AuditEntry.Record(owner, AuditAction.AccessDenied, now, id, succeeded: false),
+                cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
+        var dek = await keyWrapper.UnwrapAsync(
+            owner, new WrappedDek(item.WrappedDek, item.KekVersion), cancellationToken).ConfigureAwait(false);
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.DekUnwrapped, now, id), cancellationToken).ConfigureAwait(false);
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemRead, now, id), cancellationToken).ConfigureAwait(false);
+
+        var downloadUri = await blobStore.GetDownloadSasUriAsync(item.BlobPath, cancellationToken).ConfigureAwait(false);
+
+        return (item, dek, downloadUri);
     }
 
     /// <summary>

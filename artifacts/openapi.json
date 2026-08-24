@@ -440,6 +440,137 @@
         }
       }
     },
+    "/items/files": {
+      "post": {
+        "tags": [
+          "Items"
+        ],
+        "operationId": "CreateFile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateFileResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/files/{id}": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "operationId": "ReadFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/account": {
       "delete": {
         "tags": [
@@ -488,6 +619,61 @@
           }
         }
       },
+      "CreateFileRequest": {
+        "required": [
+          "title",
+          "sizeBytes",
+          "nonce",
+          "dek"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sizeBytes": {
+            "maximum": 26214400,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "nonce": {
+            "maxLength": 12,
+            "minLength": 12,
+            "type": "string",
+            "format": "byte"
+          },
+          "dek": {
+            "maxLength": 32,
+            "minLength": 32,
+            "type": "string",
+            "format": "byte"
+          }
+        }
+      },
+      "CreateFileResponse": {
+        "required": [
+          "id",
+          "uploadUri"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadUri": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
       "CreateSecretRequest": {
         "required": [
           "title",
@@ -518,6 +704,51 @@
             "minLength": 32,
             "type": "string",
             "format": "byte"
+          }
+        }
+      },
+      "FileResponse": {
+        "required": [
+          "id",
+          "title",
+          "sizeBytes",
+          "nonce",
+          "dek",
+          "downloadUri",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "nonce": {
+            "type": "string",
+            "format": "byte"
+          },
+          "dek": {
+            "type": "string",
+            "format": "byte"
+          },
+          "downloadUri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

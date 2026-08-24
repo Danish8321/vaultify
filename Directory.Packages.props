@@ -34,6 +34,7 @@
     <!-- 1.21.0, not 1.19.0: Azure.Core 1.54 also declares DefaultAzureCredential,
          and only 1.21.0 type-forwards it, so older pins make the type ambiguous. -->
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.24.0" />
   </ItemGroup>
 
   <ItemGroup Label="Test">

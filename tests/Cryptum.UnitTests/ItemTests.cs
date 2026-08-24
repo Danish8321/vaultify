@@ -79,10 +79,11 @@ public sealed class ItemTests
     [Fact]
     public void CreateFile_stores_a_blob_pointer_and_no_inline_ciphertext()
     {
-        var item = Item.CreateFile(Owner, "passport.pdf", "vault/abc123", ValidNonce(), Dek, Now);
+        var item = Item.CreateFile(Owner, "passport.pdf", "vault/abc123", 4096, ValidNonce(), Dek, Now);
 
         Assert.Equal(ItemKind.File, item.Kind);
         Assert.Equal("vault/abc123", item.BlobPath);
+        Assert.Equal(4096, item.SizeBytes);
         Assert.Null(item.Ciphertext);
     }
 

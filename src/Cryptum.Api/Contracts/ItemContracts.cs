@@ -129,6 +129,63 @@ public sealed record UpdateSecretRequest
 }
 
 /// <summary>
+/// Register a File. The client encrypts and uploads the ciphertext directly to
+/// blob storage using the returned SAS — this call never carries file bytes.
+/// </summary>
+public sealed record CreateFileRequest
+{
+    [Required]
+    [StringLength(Item.MaxTitleLength, MinimumLength = 1)]
+    public required string Title { get; init; }
+
+    /// <summary>Ciphertext size in bytes, as the client is about to upload it.</summary>
+    [Required]
+    [Range(1, FileLimits.MaxFileBytes)]
+    public required long SizeBytes { get; init; }
+
+    /// <summary>The 96-bit nonce used for this ciphertext.</summary>
+    [Required]
+    [MinLength(Item.NonceLength)]
+    [MaxLength(Item.NonceLength)]
+    public required byte[] Nonce { get; init; }
+
+    /// <summary>The plaintext DEK, to be wrapped and discarded. Never persisted as given.</summary>
+    [Required]
+    [MinLength(CreateSecretRequest.MinDekBytes)]
+    [MaxLength(CreateSecretRequest.MaxDekBytes)]
+    public required byte[] Dek { get; init; }
+}
+
+/// <summary>A newly registered File, with the SAS to upload its ciphertext to.</summary>
+public sealed record CreateFileResponse
+{
+    public required Guid Id { get; init; }
+
+    /// <summary>Valid for <see cref="BlobSasLifetime.Upload"/>. A single write only.</summary>
+    public required Uri UploadUri { get; init; }
+}
+
+/// <summary>A File as returned for reading: metadata plus a SAS to download its ciphertext.</summary>
+public sealed record FileResponse
+{
+    public required Guid Id { get; init; }
+
+    public required string Title { get; init; }
+
+    public required long SizeBytes { get; init; }
+
+    public required byte[] Nonce { get; init; }
+
+    /// <summary>Same exposure and handling rules as <see cref="ItemResponse.Dek"/>.</summary>
+    public required byte[] Dek { get; init; }
+
+    /// <summary>Valid for <see cref="BlobSasLifetime.Download"/>. A single read only.</summary>
+    public required Uri DownloadUri { get; init; }
+
+    public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>
 /// One entry in an Item's history list. Metadata only.
 /// </summary>
 /// <remarks>

@@ -37,6 +37,13 @@ builder.Services.AddSingleton(sp => new KeyClient(
     sp.GetRequiredService<Azure.Core.TokenCredential>()));
 builder.Services.AddSingleton<IKeyWrapper, KeyVaultKeyWrapper>();
 
+builder.Services.AddSingleton(sp => new Azure.Storage.Blobs.BlobServiceClient(
+    new Uri(builder.Configuration["BlobStorage:Uri"] ?? throw new InvalidOperationException("BlobStorage:Uri is not configured.")),
+    sp.GetRequiredService<Azure.Core.TokenCredential>()));
+builder.Services.AddSingleton<IBlobStore>(sp => new BlobStore(
+    sp.GetRequiredService<Azure.Storage.Blobs.BlobServiceClient>(),
+    builder.Configuration["BlobStorage:Container"] ?? throw new InvalidOperationException("BlobStorage:Container is not configured.")));
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

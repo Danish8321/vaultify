@@ -20,6 +20,12 @@ public interface IItemRepository
 
     Task AddAsync(Item item, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sum of <see cref="Item.SizeBytes"/> across every File Item the owner has —
+    /// the quota check's only input, since ciphertext cannot be content-inspected.
+    /// </summary>
+    Task<long> TotalFileBytesAsync(UserId owner, CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Soft-deletes every Item owned by the User, history included (ADR-0003).</summary>

@@ -96,6 +96,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.BlobPath)
             .HasMaxLength(Item.MaxBlobPathLength);
 
+        // Null for a Secret. Populated for a File at creation and never
+        // revised — an edit is a whole new File Item, not an in-place resize.
+        builder.Property(i => i.SizeBytes);
+
         builder.Property(i => i.WrappedDek)
             .IsRequired();
 

@@ -1,6 +1,6 @@
 # 20 — :app instrumentation crashed twice, unexplained
 
-Status: open, not reproduced
+Status: resolved 2026-08-24 — root cause found, not an app bug
 Severity: medium
 Source: task 2.13 follow-up, building the :app module
 
@@ -34,8 +34,39 @@ has been wrong about four times already, and an intermittent crash on the one
 module that hosts a real Activity is worth more than a shrug. A test suite that
 fails one run in five is a suite people learn to re-run instead of read.
 
+## 2026-08-24 reproduction and root cause
+
+Booted the local `Android12` AVD (`hw.ramSize=2048`), cleared logcat, ran
+`:app:connectedDebugAndroidTest --rerun-tasks`. Reproduced on the first try —
+`the_app_opens_sealed` failed with the same `Instrumentation run failed due
+to Process crashed.`
+
+Logcat (captured per the ticket's own instruction, before touching anything)
+has no `FATAL EXCEPTION` or `AndroidRuntime` — this was never an app crash.
+The kernel's low-memory-killer reaped the process directly:
+
+    lowmemorykiller: Kill 'com.cryptum' (16350), uid 10230, oom_score_adj 0
+      to free 218864kB rss, 121616kB anon rss, 32012kB swap, 0kB dmabuf_pss,
+      0kB dmabuf_rss; reason: min watermark is breached and swap is low
+      (35360kB < 37744kB)
+    Zygote: Process 16350 exited due to signal 9 (Killed)
+
+`/proc/meminfo` on the device at the time: `MemTotal: 2013492 kB`,
+`MemFree: 45820 kB`. The AVD is configured for 2 GB RAM
+(`hw.ramSize=2048`), which is thin for Gradle's test orchestration process
+plus `com.cryptum` plus `com.cryptum.test` plus system services all resident
+at once — the swap watermark breach that triggers the killer is a resource
+ceiling, not a code path.
+
 ## Resolution
 
-Next time `:app` tests are run, clear logcat first and capture it on failure.
-If it recurs, get the stack trace before changing anything — the temptation
-will be to add a retry, which converts a real crash into an invisible one.
+Not an app bug — no code change. Raised the local `Android12` AVD's
+`hw.ramSize` from 2048 to 4096 in `config.ini`. Rebooted the AVD (confirmed
+`MemTotal: 4008504 kB`), cleared logcat, and reran
+`:app:connectedDebugAndroidTest :feature-vault:connectedDebugAndroidTest
+--rerun-tasks`: 2/2 and 7/7 passed, no process death.
+
+CI's emulator config was not inspected here — this repo's CI Android job is
+still blocked per ticket 06/10, so there is nothing running today to check.
+If/when CI runs `:app:connectedAndroidTest`, its emulator profile should get
+the same RAM headroom before this is called fully closed there too.

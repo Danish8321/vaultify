@@ -46,7 +46,7 @@ public sealed class FileEndpointTests : IClassFixture<CryptumApiFactory>
     {
         using var alice = ClientWith(TestTokens.For(factory, $"alice-{Guid.NewGuid()}"));
 
-        var request = NewFile() with { SizeBytes = FileLimits.MaxFileBytes + 1 };
+        var request = NewFile() with { SizeBytes = (int)FileLimits.MaxFileBytes + 1 };
         var response = await alice.PostAsJsonAsync(new Uri("/items/files", UriKind.Relative), request);
 
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);

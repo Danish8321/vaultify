@@ -23,7 +23,6 @@
 
 package com.cryptum.api.model
 
-import com.cryptum.api.model.ItemVersionResponseVersionNumber
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -43,7 +42,7 @@ import kotlinx.serialization.Contextual
 data class ItemVersionResponse (
 
     @SerialName(value = "versionNumber")
-    val versionNumber: ItemVersionResponseVersionNumber,
+    val versionNumber: kotlin.Int,
 
     @Contextual @SerialName(value = "ciphertext")
     val ciphertext: com.cryptum.api.Base64Bytes,

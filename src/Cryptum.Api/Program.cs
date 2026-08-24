@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Azure.Security.KeyVault.Keys;
 using Cryptum.Api.Auth;
 using Cryptum.Api.Endpoints;
+using Cryptum.Api.OpenApi;
 using Cryptum.Data;
 using Cryptum.Domain;
 using Cryptum.Infrastructure;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddSchemaTransformer<PlainIntegerSchemaTransformer>());
 builder.Services.AddCryptumAuthentication(builder.Configuration);
 
 builder.Services.AddDbContext<CryptumDbContext>(options =>

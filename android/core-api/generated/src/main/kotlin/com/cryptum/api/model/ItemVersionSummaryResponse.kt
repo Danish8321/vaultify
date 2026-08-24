@@ -23,7 +23,6 @@
 
 package com.cryptum.api.model
 
-import com.cryptum.api.model.ItemVersionResponseVersionNumber
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -40,7 +39,7 @@ import kotlinx.serialization.Contextual
 data class ItemVersionSummaryResponse (
 
     @SerialName(value = "versionNumber")
-    val versionNumber: ItemVersionResponseVersionNumber,
+    val versionNumber: kotlin.Int,
 
     @Contextual @SerialName(value = "archivedAt")
     val archivedAt: kotlin.time.Instant

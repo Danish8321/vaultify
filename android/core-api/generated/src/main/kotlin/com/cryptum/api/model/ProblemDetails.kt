@@ -23,7 +23,6 @@
 
 package com.cryptum.api.model
 
-import com.cryptum.api.model.HttpValidationProblemDetailsStatus
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -49,7 +48,7 @@ data class ProblemDetails (
     val title: kotlin.String? = null,
 
     @SerialName(value = "status")
-    val status: HttpValidationProblemDetailsStatus? = null,
+    val status: kotlin.Int? = null,
 
     @SerialName(value = "detail")
     val detail: kotlin.String? = null,

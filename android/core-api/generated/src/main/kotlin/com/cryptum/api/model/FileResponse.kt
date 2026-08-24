@@ -23,7 +23,6 @@
 
 package com.cryptum.api.model
 
-import com.cryptum.api.model.FileResponseSizeBytes
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -51,7 +50,7 @@ data class FileResponse (
     val title: kotlin.String,
 
     @SerialName(value = "sizeBytes")
-    val sizeBytes: FileResponseSizeBytes,
+    val sizeBytes: kotlin.Int,
 
     @Contextual @SerialName(value = "nonce")
     val nonce: com.cryptum.api.Base64Bytes,

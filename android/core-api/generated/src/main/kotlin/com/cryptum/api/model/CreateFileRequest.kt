@@ -23,7 +23,6 @@
 
 package com.cryptum.api.model
 
-import com.cryptum.api.model.CreateFileRequestSizeBytes
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -45,7 +44,7 @@ data class CreateFileRequest (
     val title: kotlin.String,
 
     @SerialName(value = "sizeBytes")
-    val sizeBytes: CreateFileRequestSizeBytes,
+    val sizeBytes: kotlin.Int,
 
     @Contextual @SerialName(value = "nonce")
     val nonce: com.cryptum.api.Base64Bytes,

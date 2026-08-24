@@ -326,7 +326,6 @@
             "in": "path",
             "required": true,
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": "integer",
               "format": "int32"
             }
@@ -397,7 +396,6 @@
             "in": "path",
             "required": true,
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": "integer",
               "format": "int32"
             }
@@ -634,14 +632,8 @@
             "type": "string"
           },
           "sizeBytes": {
-            "maximum": 26214400,
-            "minimum": 1,
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
+            "type": "integer",
+            "format": "int32"
           },
           "nonce": {
             "maxLength": 12,
@@ -727,12 +719,8 @@
             "type": "string"
           },
           "sizeBytes": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
+            "type": "integer",
+            "format": "int32"
           },
           "nonce": {
             "type": "string",
@@ -768,12 +756,7 @@
             ]
           },
           "status": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "detail": {
@@ -871,11 +854,7 @@
         "type": "object",
         "properties": {
           "versionNumber": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "ciphertext": {
@@ -904,11 +883,7 @@
         "type": "object",
         "properties": {
           "versionNumber": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "archivedAt": {
@@ -933,12 +908,7 @@
             ]
           },
           "status": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
+            "type": "integer",
             "format": "int32"
           },
           "detail": {

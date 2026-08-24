@@ -138,10 +138,20 @@ public sealed record CreateFileRequest
     [StringLength(Item.MaxTitleLength, MinimumLength = 1)]
     public required string Title { get; init; }
 
-    /// <summary>Ciphertext size in bytes, as the client is about to upload it.</summary>
+    /// <summary>
+    /// Ciphertext size in bytes, as the client is about to upload it. An
+    /// int, not a long: the 25MB cap fits comfortably. No [Range] here —
+    /// .NET's OpenAPI generator emits a `type: [integer, string]` union
+    /// with a regex pattern (JS-safe-integer precision) for ANY property
+    /// carrying [Range], regardless of which constructor overload it
+    /// resolves to. openapi-generator's Kotlin/Ktor client can't represent
+    /// that union and silently produces an empty stub class. The bound is
+    /// instead enforced where it already was redundantly enforced: the
+    /// endpoint's manual validation and VaultService.CreateFileAsync's
+    /// quota check (FileQuotaExceededException).
+    /// </summary>
     [Required]
-    [Range(1, FileLimits.MaxFileBytes)]
-    public required long SizeBytes { get; init; }
+    public required int SizeBytes { get; init; }
 
     /// <summary>The 96-bit nonce used for this ciphertext.</summary>
     [Required]
@@ -172,7 +182,8 @@ public sealed record FileResponse
 
     public required string Title { get; init; }
 
-    public required long SizeBytes { get; init; }
+    /// <summary>See the remarks on <see cref="CreateFileRequest.SizeBytes"/> for why this is an int.</summary>
+    public required int SizeBytes { get; init; }
 
     public required byte[] Nonce { get; init; }
 

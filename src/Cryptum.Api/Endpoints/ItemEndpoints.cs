@@ -146,7 +146,9 @@ public static class ItemEndpoints
             {
                 Id = item.Id.Value,
                 Title = item.Title,
-                SizeBytes = item.SizeBytes ?? 0,
+                // Safe: SizeBytes is validated against FileLimits.MaxFileBytes (25MB) on
+                // write, well inside int range. See CreateFileRequest.SizeBytes remarks.
+                SizeBytes = (int)(item.SizeBytes ?? 0),
                 Nonce = item.Nonce,
                 Dek = dek.Span.ToArray(),
                 DownloadUri = downloadUri,

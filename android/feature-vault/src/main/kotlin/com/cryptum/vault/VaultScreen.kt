@@ -108,6 +108,7 @@ private sealed interface Screen {
 @Composable
 fun VaultScreen(
     repository: VaultRepository,
+    fileRepository: FileRepository,
     modifier: Modifier = Modifier,
     onAccountDeleted: () -> Unit = {},
 ) {
@@ -201,7 +202,7 @@ fun VaultScreen(
                             },
                         )
 
-                        Tab.Files -> FilesScreen()
+                        Tab.Files -> FilesScreen(fileRepository)
 
                         Tab.Activity -> ActivityScreen(entries = emptyList())
 
@@ -319,7 +320,7 @@ private fun TabItem(
  * [Seal.HoldToOpenMillis]; releasing early cancels with no penalty.
  */
 @Composable
-private fun HoldToOpen(
+internal fun HoldToOpen(
     modifier: Modifier = Modifier,
     onActivated: () -> Unit,
     content: @Composable (progress: Float) -> Unit,

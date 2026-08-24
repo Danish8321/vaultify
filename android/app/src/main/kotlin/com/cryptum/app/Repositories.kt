@@ -1,5 +1,6 @@
 package com.cryptum.app
 
+import com.cryptum.vault.FileRepository
 import com.cryptum.vault.VaultRepository
 
 /**
@@ -23,5 +24,12 @@ object Repositories {
             "No Vault backend is wired up yet: sign-in is deferred (ticket 14) and " +
                 "no environment is deployed (ticket 06). The Vault screens are proven " +
                 "against a fake in :feature-vault's instrumented tests.",
+        )
+
+    fun filesForSignedInUser(): FileRepository =
+        error(
+            "No Files backend is wired up yet, for the same reasons as forSignedInUser: " +
+                "sign-in is deferred (ticket 14) and no environment is deployed (ticket 06). " +
+                "The Files screen is proven against a fake in :feature-vault's instrumented tests.",
         )
 }

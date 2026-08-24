@@ -26,6 +26,11 @@ dependencies {
     api(project(":core-api"))
     implementation(project(":feature-lock"))
     implementation(libs.kotlinx.serialization.json)
+    // Raw ktor client for PUT/GET against blob SAS URIs — those calls bypass
+    // ItemsApi entirely (docs/IMPLEMENTATION-PLAN.md 3.1), so core-api's
+    // generated client doesn't cover them.
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)

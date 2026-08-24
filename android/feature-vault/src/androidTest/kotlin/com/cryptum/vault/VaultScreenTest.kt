@@ -55,7 +55,7 @@ class VaultScreenTest {
     fun a_created_Secret_can_be_read_back() {
         val repository = SealedFakeRepository()
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
 
         compose.onNodeWithTag(TAG_NEW_SECRET).performClick()
         compose.onNodeWithTag(TAG_FIELD_TITLE).performTextInput("Email")
@@ -78,7 +78,7 @@ class VaultScreenTest {
         val repository = SealedFakeRepository()
         runBlocking { repository.create("Email", SecretPayload(password = secret)) }
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
 
         compose.onNodeWithText("Email").assertExists()
         // The stored bytes are what the server would hold. If the plaintext is
@@ -90,7 +90,7 @@ class VaultScreenTest {
     fun no_plaintext_reaches_the_app_s_own_storage() {
         val repository = SealedFakeRepository()
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
 
         compose.onNodeWithTag(TAG_NEW_SECRET).performClick()
         compose.onNodeWithTag(TAG_FIELD_TITLE).performTextInput("Email")
@@ -126,7 +126,7 @@ class VaultScreenTest {
         val repository = SealedFakeRepository()
         runBlocking { repository.create("Email", SecretPayload(password = secret)) }
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
 
         performHold(compose.onNodeWithText("Email"))
         compose.waitForIdle()
@@ -155,7 +155,7 @@ class VaultScreenTest {
         runBlocking { repository.create("Email", SecretPayload(password = secret)) }
         var deleted = false
 
-        compose.setContent { VaultScreen(repository, onAccountDeleted = { deleted = true }) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository(), onAccountDeleted = { deleted = true }) }
 
         compose.onNodeWithTag(TAG_SETTINGS).performClick()
         compose.onNodeWithTag(TAG_DELETE_ACCOUNT_ROW).performClick()
@@ -185,7 +185,7 @@ class VaultScreenTest {
         // fabricated data.
         val repository = SealedFakeRepository()
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
 
         compose.onNodeWithTag(TAG_SETTINGS).performClick()
         compose.onNodeWithTag(TAG_VIEW_ACTIVITY_ROW).performClick()
@@ -204,7 +204,7 @@ class VaultScreenTest {
             repository.create("Router admin", SecretPayload(password = "third"))
         }
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
         compose.waitForIdle()
         capture("vault-list.png")
 
@@ -219,7 +219,7 @@ class VaultScreenTest {
         // reviewed as pixels rather than as a description.
         val repository = SealedFakeRepository()
 
-        compose.setContent { VaultScreen(repository) }
+        compose.setContent { VaultScreen(repository, SealedFakeFileRepository()) }
         compose.onNodeWithTag(TAG_TAB_FILES).performClick()
         compose.waitForIdle()
         capture("files-list.png")
@@ -282,12 +282,42 @@ private class SealedFakeRepository : VaultRepository {
         rows[id] = Row(request.title, request.ciphertext, request.nonce, request.dek.copyOf())
     }
 
+
     override suspend fun delete() {
         rows.clear()
     }
 
     fun storedBytesContain(text: String): Boolean =
         rows.values.any { (it.ciphertext + it.nonce).containsBytesOf(text) }
+}
+
+/**
+ * Stores exactly what the server would store for a File: ciphertext, nonce
+ * and the DEK. Nothing here can return bytes it was not given in sealed form.
+ */
+private class SealedFakeFileRepository : FileRepository {
+
+    private class Row(val title: String, val ciphertext: ByteArray, val nonce: ByteArray, val dek: ByteArray)
+
+    private val rows = LinkedHashMap<UUID, Row>()
+
+    override suspend fun list(): List<FileSummary> =
+        rows.map { (id, row) -> FileSummary(id, row.title) }
+
+    override suspend fun upload(title: String, bytes: ByteArray): UUID {
+        val sealed = com.cryptum.crypto.CryptoCore.seal(bytes)
+        val id = UUID.randomUUID()
+        rows[id] = Row(title, sealed.ciphertext, sealed.nonce, sealed.dek.copyOf())
+        return id
+    }
+
+    override suspend fun download(id: UUID): ByteArray {
+        val row = requireNotNull(rows[id])
+        return com.cryptum.crypto.CryptoCore.open(
+            com.cryptum.crypto.SealedSecret(row.ciphertext, row.nonce, row.dek),
+            row.dek,
+        )
+    }
 }
 
 /**

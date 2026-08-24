@@ -83,7 +83,8 @@ class MainActivity : FragmentActivity() {
                         // Vault is sealed there is no repository, so there is nothing
                         // holding a connection or a token in memory behind the seal.
                         val repository = remember { Repositories.forSignedInUser() }
-                        VaultScreen(repository, onAccountDeleted = { lock.onAccountDeleted() })
+                        val fileRepository = remember { Repositories.filesForSignedInUser() }
+                        VaultScreen(repository, fileRepository, onAccountDeleted = { lock.onAccountDeleted() })
                     }
                 }
             }

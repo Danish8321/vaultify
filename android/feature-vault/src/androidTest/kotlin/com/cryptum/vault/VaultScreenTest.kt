@@ -35,6 +35,22 @@ class VaultScreenTest {
 
     private val secret = "correct horse battery staple"
 
+    /**
+     * Holds [node] for [Seal.HoldToOpenMillis], real wall time — the app-side
+     * `LaunchedEffect(delay(...))` this drives runs on the actual clock, not a
+     * test-controlled one. Releases through [ComposeContentTestRule.onRoot]
+     * rather than re-resolving [node]: the hold firing usually replaces the
+     * node's content (a list row becomes the opened screen) before release,
+     * and re-resolving a since-changed node for `up()` throws before it ever
+     * reaches the input dispatcher — silently leaving pointer 0 stuck DOWN for
+     * whichever gesture runs next.
+     */
+    private fun performHold(node: androidx.compose.ui.test.SemanticsNodeInteraction) {
+        node.performTouchInput { down(center) }
+        Thread.sleep(com.cryptum.lock.Seal.HoldToOpenMillis.toLong() + 250)
+        compose.onRoot().performTouchInput { up() }
+    }
+
     @Test
     fun a_created_Secret_can_be_read_back() {
         val repository = SealedFakeRepository()
@@ -51,9 +67,9 @@ class VaultScreenTest {
         compose.onNodeWithText("Email").assertExists()
         compose.onNodeWithText(secret).assertDoesNotExist()
 
-        compose.onNodeWithText("Email").performHold()
+        performHold(compose.onNodeWithText("Email"))
         compose.waitForIdle()
-        compose.onNodeWithTag(TAG_REVEAL).performHold()
+        performHold(compose.onNodeWithTag(TAG_REVEAL))
         compose.onNodeWithText(secret).assertExists()
     }
 
@@ -80,9 +96,9 @@ class VaultScreenTest {
         compose.onNodeWithTag(TAG_FIELD_TITLE).performTextInput("Email")
         compose.onNodeWithTag(TAG_FIELD_PASSWORD).performTextInput(secret)
         compose.onNodeWithTag(TAG_SAVE).performClick()
-        compose.onNodeWithText("Email").performHold()
+        performHold(compose.onNodeWithText("Email"))
         compose.waitForIdle()
-        compose.onNodeWithTag(TAG_REVEAL).performHold()
+        performHold(compose.onNodeWithTag(TAG_REVEAL))
         compose.onNodeWithText(secret).assertExists()
         compose.waitForIdle()
 
@@ -103,6 +119,81 @@ class VaultScreenTest {
     }
 
     @Test
+    fun editing_a_Secret_persists_through_the_repository() {
+        // Ticket 24: onSaveEdit must actually call VaultRepository.update(),
+        // not just navigate as if it had. Proven by reading the Secret back
+        // through a fresh screen instance backed by the same repository.
+        val repository = SealedFakeRepository()
+        runBlocking { repository.create("Email", SecretPayload(password = secret)) }
+
+        compose.setContent { VaultScreen(repository) }
+
+        performHold(compose.onNodeWithText("Email"))
+        compose.waitForIdle()
+        // TAG_EDIT only exists once the Secret is revealed (hold-to-reveal),
+        // not merely opened — see OpenedSecret's sealState == Open gate.
+        performHold(compose.onNodeWithTag(TAG_REVEAL))
+        compose.waitForIdle()
+        compose.onNodeWithTag(TAG_EDIT).performClick()
+
+        val updated = "a whole new password"
+        compose.onNodeWithTag(TAG_FIELD_PASSWORD).performTextInput(updated)
+        compose.onNodeWithTag(TAG_SAVE).performClick()
+        compose.waitForIdle()
+
+        val persisted = runBlocking { repository.read(repository.list().single().id) }
+        assertTrue(persisted.password?.contains(updated) == true)
+    }
+
+    @Test
+    fun deleting_the_account_calls_the_repository_and_notifies_the_caller() {
+        // Ticket 23: onConfirmDelete must actually reach VaultRepository.delete()
+        // and the caller must be told once the shred animation completes, so
+        // MainActivity can re-lock instead of leaving an unlocked Vault whose
+        // key no longer exists.
+        val repository = SealedFakeRepository()
+        runBlocking { repository.create("Email", SecretPayload(password = secret)) }
+        var deleted = false
+
+        compose.setContent { VaultScreen(repository, onAccountDeleted = { deleted = true }) }
+
+        compose.onNodeWithTag(TAG_SETTINGS).performClick()
+        compose.onNodeWithTag(TAG_DELETE_ACCOUNT_ROW).performClick()
+        compose.onNodeWithTag(TAG_DELETE_CONFIRM_FIELD).performTextInput("DELETE")
+        compose.onNodeWithTag(TAG_DELETE_CONFIRM_BUTTON).performClick()
+        compose.waitForIdle()
+
+        assertTrue(runBlocking { repository.list() }.isEmpty(), "repository.delete() was not called")
+
+        // The shred animation fires onFinished after ShreddingDurationMillis.
+        // ComposeTestRule runs the composition's LaunchedEffect coroutines on
+        // its own test dispatcher, so delay() doesn't progress with real wall
+        // time (a Thread.sleep on this thread never touches it) — it advances
+        // only through the test clock, which is the supported way to drive it
+        // deterministically.
+        compose.mainClock.advanceTimeBy(ShreddingDurationMillis.toLong() + 500)
+        compose.waitForIdle()
+        assertTrue(deleted, "onAccountDeleted was never invoked")
+    }
+
+    @Test
+    fun settings_navigates_to_the_activity_screen() {
+        // Follow-up item #4 from ticket 23's close-out: ActivityScreen had no
+        // navigation entry point. There is no activity-log data source yet
+        // (no VaultRepository method, no core-api endpoint), so this proves
+        // only the navigation reaches a real, empty ActivityScreen — not
+        // fabricated data.
+        val repository = SealedFakeRepository()
+
+        compose.setContent { VaultScreen(repository) }
+
+        compose.onNodeWithTag(TAG_SETTINGS).performClick()
+        compose.onNodeWithTag(TAG_VIEW_ACTIVITY_ROW).performClick()
+
+        compose.onNodeWithTag(TAG_ACTIVITY_SCREEN).assertExists()
+    }
+
+    @Test
     fun capture_the_vault_screens() {
         // Not an assertion — a rendering, so the design can be reviewed as
         // pixels rather than as a description.
@@ -117,7 +208,7 @@ class VaultScreenTest {
         compose.waitForIdle()
         capture("vault-list.png")
 
-        compose.onNodeWithText("Email").performHold()
+        performHold(compose.onNodeWithText("Email"))
         compose.waitForIdle()
         capture("vault-opened.png")
     }
@@ -170,6 +261,15 @@ private class SealedFakeRepository : VaultRepository {
         return SecretEnvelope.open(row.ciphertext, row.nonce, row.dek)
     }
 
+    override suspend fun update(id: UUID, title: String, payload: SecretPayload) {
+        val request = SecretEnvelope.sealForUpdate(title, payload)
+        rows[id] = Row(request.title, request.ciphertext, request.nonce, request.dek.copyOf())
+    }
+
+    override suspend fun delete() {
+        rows.clear()
+    }
+
     fun storedBytesContain(text: String): Boolean =
         rows.values.any { (it.ciphertext + it.nonce).containsBytesOf(text) }
 }
@@ -184,15 +284,6 @@ private class SealedFakeRepository : VaultRepository {
  * delivers down/up back-to-back with no actual elapsed time for the delay to
  * observe.
  */
-private fun androidx.compose.ui.test.SemanticsNodeInteraction.performHold() {
-    performTouchInput { down(center) }
-    Thread.sleep(com.cryptum.lock.Seal.HoldToOpenMillis.toLong() + 250)
-    // The hold firing usually replaces this node's content (the row becomes
-    // "opened", the reveal prompt becomes the plaintext) before the release
-    // is injected, so the up() target may already be gone — that is success,
-    // not a failure to clean up after.
-    runCatching { performTouchInput { up() } }
-}
 
 private fun ByteArray.containsBytesOf(text: String): Boolean {
     val needle = text.toByteArray()

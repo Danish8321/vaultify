@@ -89,6 +89,21 @@ class SecretEnvelopeTest {
         assertFalse(first.ciphertext.contentEquals(second.ciphertext))
     }
 
+    @Test
+    fun `an edited Secret seals for update and opens back to the edited fields`() {
+        // Proves the edit path's envelope (ticket 24): sealForUpdate produces
+        // the same shape of ciphertext/nonce/dek that open() already round-trips
+        // for create/read, so ApiVaultRepository.update() reuses that guarantee
+        // rather than a second, unverified codec.
+        val edited = payload.copy(password = "a new correct horse battery staple")
+        val request = SecretEnvelope.sealForUpdate(title = "Example", payload = edited)
+
+        val reopened = SecretEnvelope.open(request.ciphertext, request.nonce, request.dek)
+
+        assertEquals(edited, reopened)
+        assertEquals("Example", request.title)
+    }
+
     private fun ByteArray.containsBytesOf(text: String): Boolean {
         val needle = text.toByteArray()
         if (needle.isEmpty() || needle.size > size) return false

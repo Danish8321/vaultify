@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.cryptum.lock.Seal
 import com.cryptum.lock.SealRadius
@@ -26,9 +27,13 @@ import com.cryptum.lock.SealRadius
  * layer yet, so wiring toggles/editing here would be a fake control with
  * nothing behind it. That's a further slice if wanted.
  */
+const val TAG_DELETE_ACCOUNT_ROW = "delete-account-row"
+const val TAG_VIEW_ACTIVITY_ROW = "view-activity-row"
+
 @Composable
 fun SettingsScreen(
     themeLabel: String,
+    onViewActivity: () -> Unit,
     onDeleteAccount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -36,7 +41,25 @@ fun SettingsScreen(
         SettingsRow(label = "Auto-reseal window", value = "${Seal.AutoResealSeconds}s")
         SettingsRow(label = "Clipboard clear", value = "${Seal.ClipboardClearSeconds}s")
         SettingsRow(label = "Appearance", value = themeLabel)
+        NavigationRow(label = "View activity", tag = TAG_VIEW_ACTIVITY_ROW, onClick = onViewActivity)
         DeleteAccountRow(onClick = onDeleteAccount)
+    }
+}
+
+@Composable
+private fun NavigationRow(label: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(tag)
+            .background(Seal.CardBg, RoundedCornerShape(SealRadius.Card))
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp, horizontal = Seal.Gutter),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, color = Seal.Ink, fontSize = Seal.BodySize)
+        ChevronGlyph(color = Seal.InkDim)
     }
 }
 
@@ -60,6 +83,7 @@ private fun DeleteAccountRow(onClick: () -> Unit, modifier: Modifier = Modifier)
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .testTag(TAG_DELETE_ACCOUNT_ROW)
             .background(Seal.CardBg, RoundedCornerShape(SealRadius.Card))
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp, horizontal = Seal.Gutter),
@@ -67,7 +91,7 @@ private fun DeleteAccountRow(onClick: () -> Unit, modifier: Modifier = Modifier)
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = "Delete account", color = Seal.Open, fontSize = Seal.BodySize)
-        ChevronGlyph()
+        ChevronGlyph(color = Seal.Open)
     }
 }
 
@@ -78,13 +102,13 @@ private fun DeleteAccountRow(onClick: () -> Unit, modifier: Modifier = Modifier)
  * ActivityScreen.kt).
  */
 @Composable
-private fun ChevronGlyph(modifier: Modifier = Modifier) {
+private fun ChevronGlyph(color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(14.dp)) {
         val path = Path().apply {
             moveTo(0f, 0f)
             lineTo(size.width, size.height / 2f)
             lineTo(0f, size.height)
         }
-        drawPath(path, color = Seal.Open, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f))
+        drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f))
     }
 }

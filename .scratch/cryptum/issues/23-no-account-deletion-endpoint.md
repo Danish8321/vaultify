@@ -1,8 +1,39 @@
 # 23 — DeleteAccountScreen's confirm button is a no-op hook
 
-**Status:** open
+**Status:** closed
 **Severity:** medium
 **Found:** 2026-08-23, implementing design-sync-android plan task 8
+**Closed:** 2026-08-23
+
+## Resolution
+
+`AccountApi.deleteAccount()` (`DELETE /account`) already existed in the
+generated client — same shape as ticket 24, no cross-tier contract work
+needed. Added:
+
+- `VaultRepository.delete()` + `ApiVaultRepository` impl calling
+  `AccountApi.deleteAccount()`. `ApiVaultRepository` now takes `AccountApi` as
+  a second constructor argument.
+- `AppLock.onAccountDeleted()` — forces the gate locked once the key is
+  destroyed server-side, so the caller can't be left holding an unlocked Vault
+  whose key no longer exists.
+- `VaultScreen` gained real navigation: a "settings" entry point on the list
+  screen (`TAG_SETTINGS`) → `SettingsScreen` → `DeleteAccountScreen` →
+  (on confirm) `repository.delete()` → `ShreddingScreen` → `onAccountDeleted`
+  callback, wired in `MainActivity` to `lock.onAccountDeleted()`. A failed
+  `delete()` call leaves the confirm screen up rather than animating a
+  destruction that didn't happen.
+- `VaultScreenTest.deleting_the_account_calls_the_repository_and_notifies_the_caller`:
+  drives the real UI through settings → confirm → shred, then asserts both
+  that the repository was actually called (`repository.list()` empty
+  afterward) and that `onAccountDeleted` fired.
+
+Verified: `:feature-vault:test`, `:feature-vault:compileDebugAndroidTestKotlin`,
+`:feature-lock:test`, `:app:compileDebugKotlin` all pass clean.
+
+Note: `ActivityScreen` still has no navigation entry point — that's pending
+item #4 on the follow-up list (separate from this ticket), not blocked by
+anything closed here.
 
 ## What
 

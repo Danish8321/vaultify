@@ -1,8 +1,29 @@
 # 24 — `VaultRepository` has no `update()`, so Edit doesn't persist
 
-**Status:** open
+**Status:** closed
 **Severity:** medium
 **Found:** 2026-08-23, implementing design-sync-android plan Task 10
+**Closed:** 2026-08-23
+
+## Resolution
+
+`ItemsApi.updateSecret(id, UpdateSecretRequest)` already existed in the generated
+client (`PUT /items/{id}`) — no cross-tier contract work needed. Added:
+
+- `SecretEnvelope.sealForUpdate(title, payload): UpdateSecretRequest` — same
+  seal pattern as `seal()`, different wire type.
+- `VaultRepository.update(id, title, payload)` + `ApiVaultRepository` impl,
+  zeroing the DEK after the call same as `create()`.
+- `VaultScreen`'s `onSaveEdit` now calls `repository.update(...)` and refreshes
+  the list; on failure it falls back to the last known-good payload rather than
+  showing the unpersisted edit as saved.
+- `SecretEnvelopeTest`: round-trip test for `sealForUpdate`/`open`.
+- `VaultScreenTest.editing_a_Secret_persists_through_the_repository`: edits
+  through the real UI, then reads the Secret back through the same fake
+  repository to prove the write actually landed.
+
+Verified: `:feature-vault:test` and `:feature-vault:compileDebugAndroidTestKotlin`
+both pass clean.
 
 ## What
 

@@ -1,5 +1,6 @@
 package com.cryptum.vault
 
+import com.cryptum.api.AccountApi
 import com.cryptum.api.ItemsApi
 import com.cryptum.api.model.CreateSecretRequest
 import java.util.UUID
@@ -23,6 +24,9 @@ interface VaultRepository {
     suspend fun list(): List<SecretSummary>
     suspend fun create(title: String, payload: SecretPayload): UUID
     suspend fun read(id: UUID): SecretPayload
+    suspend fun update(id: UUID, title: String, payload: SecretPayload)
+    /** Crypto-shreds the whole Vault: destroys the key, not the rows (ADR-0003). */
+    suspend fun delete()
 }
 
 /**
@@ -33,7 +37,10 @@ interface VaultRepository {
  * only a real server can falsify. That is task 2.14's job, and claiming this
  * class is verified before then would be a claim without evidence.
  */
-class ApiVaultRepository(private val api: ItemsApi) : VaultRepository {
+class ApiVaultRepository(
+    private val api: ItemsApi,
+    private val accountApi: AccountApi,
+) : VaultRepository {
 
     override suspend fun list(): List<SecretSummary> =
         api.listItems().body().map { SecretSummary(id = it.id, title = it.title, hint = it.kind) }
@@ -58,5 +65,18 @@ class ApiVaultRepository(private val api: ItemsApi) : VaultRepository {
         } finally {
             item.dek.fill(0)
         }
+    }
+
+    override suspend fun update(id: UUID, title: String, payload: SecretPayload) {
+        val request = SecretEnvelope.sealForUpdate(title, payload)
+        try {
+            api.updateSecret(id, request)
+        } finally {
+            request.dek.fill(0)
+        }
+    }
+
+    override suspend fun delete() {
+        accountApi.deleteAccount()
     }
 }

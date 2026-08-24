@@ -61,6 +61,7 @@ const val TAG_REVEAL = "reveal"
 const val TAG_RESEAL_NOW = "reseal-now"
 const val TAG_EDIT = "edit"
 const val TAG_BACK = "back"
+const val TAG_SETTINGS = "settings"
 
 /** The one thing on screen at a time. Replaces two nullable/boolean flags so
  * the seal/open transition below has a single, stable key to animate on. */
@@ -68,15 +69,16 @@ private sealed interface Screen {
     data object List : Screen
     data object Compose : Screen
     data class Open(val id: UUID, val title: String, val payload: SecretPayload) : Screen
-    /**
-     * Editing an existing Secret. There is no `VaultRepository.update()` yet
-     * (see .scratch/cryptum/issues/24-vault-repository-missing-update.md), so
-     * [VaultScreen] wires this to a no-op save for now — the UI is real, the
-     * persistence is not.
-     */
+    /** Editing an existing Secret. Saving calls `VaultRepository.update()`. */
     data class Edit(val id: UUID, val title: String, val payload: SecretPayload) : Screen
     /** The read failed — no plaintext ever existed on this device. */
     data class Failed(val title: String) : Screen
+    data object Settings : Screen
+    /** No `entries` data source exists yet — see ActivityScreen.kt's doc
+     * comment. Reachable and honest (an empty log), not fabricated. */
+    data object Activity : Screen
+    data object ConfirmDelete : Screen
+    data object Shredding : Screen
 }
 
 /**
@@ -89,7 +91,11 @@ private sealed interface Screen {
  * thought they closed it.
  */
 @Composable
-fun VaultScreen(repository: VaultRepository, modifier: Modifier = Modifier) {
+fun VaultScreen(
+    repository: VaultRepository,
+    modifier: Modifier = Modifier,
+    onAccountDeleted: () -> Unit = {},
+) {
     var summaries by remember { mutableStateOf(emptyList<SecretSummary>()) }
     var screen by remember { mutableStateOf<Screen>(Screen.List) }
     val scope = rememberCoroutineScope()
@@ -129,13 +135,19 @@ fun VaultScreen(repository: VaultRepository, modifier: Modifier = Modifier) {
                     editing = Triple(state.id, state.title, state.payload),
                     onCancel = { screen = Screen.List },
                     onSave = { _, _ -> },
-                    onSaveEdit = { id, _ ->
-                        // No VaultRepository.update() exists yet — see
-                        // .scratch/cryptum/issues/24-vault-repository-missing-update.md.
-                        // Returning to the *original* payload, not the locally-edited
-                        // one: showing the edit as if it were saved would be a false
-                        // "saved" state the next real read silently contradicts.
-                        screen = Screen.Open(id, state.title, state.payload)
+                    onSaveEdit = { id, payload ->
+                        scope.launch {
+                            screen = try {
+                                repository.update(id, state.title, payload)
+                                refresh()
+                                Screen.Open(id, state.title, payload)
+                            } catch (e: Exception) {
+                                // Update failed server-side: show the last known-good
+                                // (persisted) payload, not the unpersisted edit — a
+                                // failed save must never look like a successful one.
+                                Screen.Open(id, state.title, state.payload)
+                            }
+                        }
                     },
                 )
 
@@ -165,7 +177,38 @@ fun VaultScreen(repository: VaultRepository, modifier: Modifier = Modifier) {
                             }
                         }
                     },
+                    onSettings = { screen = Screen.Settings },
                 )
+
+                Screen.Settings -> SettingsScreen(
+                    themeLabel = "System",
+                    onViewActivity = { screen = Screen.Activity },
+                    onDeleteAccount = { screen = Screen.ConfirmDelete },
+                )
+
+                Screen.Activity -> ActivityScreen(entries = emptyList())
+
+                Screen.ConfirmDelete -> DeleteAccountScreen(
+                    onConfirmDelete = {
+                        scope.launch {
+                            // Fire the crypto-shred first: the transient
+                            // Shredding animation is honest only if the key is
+                            // already gone by the time it starts, not a promise
+                            // shown before the call that could still fail. A
+                            // failed call leaves the confirm screen up rather
+                            // than animating a destruction that didn't happen.
+                            try {
+                                repository.delete()
+                                screen = Screen.Shredding
+                            } catch (e: Exception) {
+                                // Stays on Screen.ConfirmDelete.
+                            }
+                        }
+                    },
+                    onCancel = { screen = Screen.Settings },
+                )
+
+                Screen.Shredding -> ShreddingScreen(onFinished = onAccountDeleted)
             }
         }
     }
@@ -243,11 +286,27 @@ private fun SecretList(
     summaries: List<SecretSummary>,
     onNew: () -> Unit,
     onOpen: (SecretSummary) -> Unit,
+    onSettings: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = Seal.Gutter)) {
         Spacer(Modifier.height(56.dp))
 
-        Text("V A U L T", color = Seal.InkDim, fontSize = 13.sp, letterSpacing = 0.32.sp)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("V A U L T", color = Seal.InkDim, fontSize = 13.sp, letterSpacing = 0.32.sp)
+            Text(
+                "settings",
+                color = Seal.InkDim,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .testTag(TAG_SETTINGS)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { onSettings() }) },
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
 

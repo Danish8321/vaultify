@@ -18,12 +18,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.cryptum.lock.Seal
 import com.cryptum.lock.SealChip
 import com.cryptum.lock.SealRadius
 import com.cryptum.lock.SealState
+
+const val TAG_ACTIVITY_SCREEN = "activity-screen"
 
 /**
  * For each entry, whether its group header should render — true only when
@@ -49,7 +52,7 @@ fun computeShowHeader(entries: List<ActivityEntry>): List<Boolean> =
 fun ActivityScreen(entries: List<ActivityEntry>, modifier: Modifier = Modifier) {
     val showHeader = computeShowHeader(entries)
 
-    LazyColumn(modifier = modifier.fillMaxWidth().background(Seal.Ground)) {
+    LazyColumn(modifier = modifier.fillMaxWidth().background(Seal.Ground).testTag(TAG_ACTIVITY_SCREEN)) {
         items(entries.size) { index ->
             val entry = entries[index]
             Column {

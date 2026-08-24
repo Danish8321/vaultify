@@ -40,6 +40,14 @@ class AppLock {
     fun onBackgrounded() = transitionTo(locked = true)
 
     /**
+     * Called once the key has been destroyed server-side (crypto-shred
+     * complete). There is nothing left to show unlocked — this forces the
+     * gate shut so the next thing the user sees is the lock screen, not a
+     * Vault holding a repository whose key no longer exists.
+     */
+    fun onAccountDeleted() = transitionTo(locked = true)
+
+    /**
      * Called when the app returns to the foreground.
      *
      * Intentionally does nothing. Resuming is not evidence of anything — the

@@ -3,8 +3,10 @@ package com.cryptum.app
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.core.content.ContextCompat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,19 +63,19 @@ class MainActivity : FragmentActivity() {
                 val lock = remember { AppLock() }
                 var locked by remember { mutableStateOf(true) }
 
-                remember(lock) { lock.onLockStateChanged { locked = it } }
+                SideEffect { lock.onLockStateChanged { locked = it } }
 
                 ReLockOnBackground(lock)
 
                 LockGate(
                     isLocked = locked,
-                    onUnlockRequested = { promptToUnlock(this, lock, mainExecutor) },
+                    onUnlockRequested = { promptToUnlock(this, lock, ContextCompat.getMainExecutor(this)) },
                 ) {
                     // Constructed inside the unlocked branch on purpose: while the
                     // Vault is sealed there is no repository, so there is nothing
                     // holding a connection or a token in memory behind the seal.
                     val repository = remember { Repositories.forSignedInUser() }
-                    VaultScreen(repository)
+                    VaultScreen(repository, onAccountDeleted = { lock.onAccountDeleted() })
                 }
             }
         }

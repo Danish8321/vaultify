@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.cryptum.lock.Seal
 import com.cryptum.lock.SealRadius
@@ -40,6 +41,9 @@ import kotlinx.coroutines.delay
  * matching the prototype - typing "delete" is not the same as meaning it.
  */
 private const val CONFIRMATION_PHRASE = "DELETE"
+
+const val TAG_DELETE_CONFIRM_FIELD = "delete-confirm-field"
+const val TAG_DELETE_CONFIRM_BUTTON = "delete-confirm-button"
 
 /**
  * Whether the typed confirmation text unlocks the delete button. Extracted
@@ -78,7 +82,7 @@ fun DeleteAccountScreen(
         OutlinedTextField(
             value = typed,
             onValueChange = { typed = it },
-            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp).testTag(TAG_DELETE_CONFIRM_FIELD),
             label = { Text("Type DELETE to confirm") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Seal.Ink,
@@ -90,7 +94,7 @@ fun DeleteAccountScreen(
             enabled = isDeleteConfirmed(typed),
             shape = RoundedCornerShape(SealRadius.Button),
             colors = ButtonDefaults.buttonColors(containerColor = Seal.Open),
-            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp).testTag(TAG_DELETE_CONFIRM_BUTTON),
         ) {
             Text("Delete permanently")
         }

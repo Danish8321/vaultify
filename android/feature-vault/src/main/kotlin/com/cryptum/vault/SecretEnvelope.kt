@@ -2,6 +2,7 @@ package com.cryptum.vault
 
 import com.cryptum.api.model.CreateSecretRequest
 import com.cryptum.api.model.ItemResponse
+import com.cryptum.api.model.UpdateSecretRequest
 import com.cryptum.crypto.CryptoCore
 import com.cryptum.crypto.SealedSecret
 import kotlinx.serialization.json.Json
@@ -37,6 +38,21 @@ object SecretEnvelope {
         plaintext.fill(0)
 
         return CreateSecretRequest(
+            title = title,
+            ciphertext = sealed.ciphertext,
+            nonce = sealed.nonce,
+            dek = sealed.dek,
+        )
+    }
+
+    /** Seals [payload] for an update request. Same envelope as [seal], different wire shape. */
+    fun sealForUpdate(title: String, payload: SecretPayload): UpdateSecretRequest {
+        val plaintext = json.encodeToString(SecretPayload.serializer(), payload).toByteArray()
+
+        val sealed = CryptoCore.seal(plaintext)
+        plaintext.fill(0)
+
+        return UpdateSecretRequest(
             title = title,
             ciphertext = sealed.ciphertext,
             nonce = sealed.nonce,

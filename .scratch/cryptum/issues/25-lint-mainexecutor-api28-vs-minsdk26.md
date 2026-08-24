@@ -1,6 +1,6 @@
 # 25 — `getMainExecutor()` requires API 28, minSdk is 26
 
-Status: open
+Status: closed
 Severity: medium
 Source: design-sync-android plan, Task 12 (full `./gradlew build`)
 
@@ -33,3 +33,19 @@ not `build`/`lint`).
 
 `./gradlew build` (including `:app:lintDebug`) passes with `minSdk` unchanged at 26, or an explicit
 decision is recorded to raise it.
+
+## Resolution
+
+Took option 2: `MainActivity.kt`'s `mainExecutor` (Activity property, API 28) replaced with
+`ContextCompat.getMainExecutor(this)` (androidx.core, API-26-safe) — `minSdk` unchanged at 26.
+
+Fixing this surfaced a second, unrelated pre-existing lint error in the same composable —
+`remember(lock) { lock.onLockStateChanged { locked = it } }` (`RememberReturnType`: a `remember`
+returning `Unit` is always wrong, since composition failure/replay can silently drop the
+registration). Fixed in the same pass since it blocked the same done-criterion
+(`:app:lintDebug`/`build` passing) and touched the same three-line block: replaced with
+`SideEffect { lock.onLockStateChanged { locked = it } }`. Re-registering the listener every
+recomposition is harmless — `AppLock.onLockStateChanged` just overwrites a single-slot field, no
+accumulation.
+
+Verified: `:app:lintDebug` clean, and `./gradlew test build` (full, all modules) clean.

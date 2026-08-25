@@ -39,9 +39,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.cryptum.lock.Seal
 import com.cryptum.lock.SealRadius
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 
 const val TAG_NEW_FILE = "new-file"
@@ -59,10 +61,11 @@ const val TAG_FILE_SHEET_CANCEL = "file-sheet-cancel"
  * [FileRepository.upload] requests.
  *
  * Holding a row downloads and decrypts it — the same hold-to-reveal gesture
- * as a Secret ([HoldToOpen], from `VaultScreen.kt`) — but there is no
- * external viewer wired up yet (that needs a `FileProvider`, a separate
- * manifest-level change out of this slice's scope); a successful hold just
- * proves the round trip by flipping the row to "opened".
+ * as a Secret ([HoldToOpen], from `VaultScreen.kt`) — then writes the
+ * plaintext to `cacheDir/opened-files/` and hands it to an external viewer
+ * via the app's `FileProvider` (never external storage: plaintext at rest
+ * outside the cache is the thing this app exists to avoid). See
+ * `.scratch/cryptum/issues/27-file-open-no-external-viewer.md`.
  *
  * "Delete selected" calls [FileRepository.delete] for each selected row,
  * then reloads the list from the server.
@@ -85,6 +88,23 @@ internal fun FilesScreen(repository: FileRepository, modifier: Modifier = Modifi
 
     fun toggleSelect(id: UUID) {
         selected = if (id in selected) selected - id else selected + id
+    }
+
+    fun openExternally(file: FileSummary, plaintext: ByteArray) {
+        val dir = File(context.cacheDir, "opened-files").apply { mkdirs() }
+        val target = File(dir, file.title)
+        target.writeBytes(plaintext)
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+        val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(file.title)
+        val mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            ?: "application/octet-stream"
+
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(intent, "Open ${file.title}"))
     }
 
     fun uploadPicked(uri: android.net.Uri?, fallbackTitle: String) {
@@ -172,8 +192,9 @@ internal fun FilesScreen(repository: FileRepository, modifier: Modifier = Modifi
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             onActivated = {
                                 scope.launch {
-                                    repository.download(file.id)
+                                    val plaintext = repository.download(file.id)
                                     opened = opened + file.id
+                                    openExternally(file, plaintext)
                                 }
                             },
                         ) { _ ->

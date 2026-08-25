@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Decrypted File bytes are written here, never to external storage — this
+  app exists to keep them off disk in plaintext anywhere else. cache-path
+  points at context.cacheDir/opened-files, which the OS may clear at will;
+  that's fine, a re-open just re-downloads and re-decrypts.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="opened_files" path="opened-files/" />
+</paths>

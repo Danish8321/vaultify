@@ -64,9 +64,8 @@ const val TAG_FILE_SHEET_CANCEL = "file-sheet-cancel"
  * manifest-level change out of this slice's scope); a successful hold just
  * proves the round trip by flipping the row to "opened".
  *
- * There is also no per-file delete: the backend has no such endpoint (same
- * gap Secrets have — see [FileRepository]). "Delete selected" removes rows
- * from this screen's own list only, not from the server.
+ * "Delete selected" calls [FileRepository.delete] for each selected row,
+ * then reloads the list from the server.
  */
 @Composable
 internal fun FilesScreen(repository: FileRepository, modifier: Modifier = Modifier) {
@@ -161,6 +160,7 @@ internal fun FilesScreen(repository: FileRepository, modifier: Modifier = Modifi
                                     .size(22.dp)
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(if (checked) Seal.Open else Color.Transparent)
+                                    .testTag("files-row-select-${file.id}")
                                     .clickable { toggleSelect(file.id) },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -217,10 +217,13 @@ internal fun FilesScreen(repository: FileRepository, modifier: Modifier = Modifi
                         .background(Seal.Open)
                         .testTag(TAG_FILES_DELETE_SELECTED)
                         .clickable {
-                            // No backend delete-one-file endpoint exists yet — this
-                            // only drops the rows from this screen's own list.
-                            files = files.filterNot { it.id in selected }
+                            val toDelete = selected
+                            selecting = false
                             selected = emptySet()
+                            scope.launch {
+                                toDelete.forEach { repository.delete(it) }
+                                refresh()
+                            }
                         },
                     contentAlignment = Alignment.Center,
                 ) {

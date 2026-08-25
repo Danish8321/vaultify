@@ -25,6 +25,10 @@ interface VaultRepository {
     suspend fun create(title: String, payload: SecretPayload): UUID
     suspend fun read(id: UUID): SecretPayload
     suspend fun update(id: UUID, title: String, payload: SecretPayload)
+
+    /** Soft-deletes a single Secret (`DELETE /items/{id}`, shared with Files). */
+    suspend fun deleteItem(id: UUID)
+
     /** Crypto-shreds the whole Vault: destroys the key, not the rows (ADR-0003). */
     suspend fun delete()
 }
@@ -74,6 +78,10 @@ class ApiVaultRepository(
         } finally {
             request.dek.fill(0)
         }
+    }
+
+    override suspend fun deleteItem(id: UUID) {
+        api.deleteItem(id)
     }
 
     override suspend fun delete() {

@@ -18,10 +18,8 @@ data class FileSummary(val id: UUID, val title: String)
 /**
  * What the Files screen is allowed to know about the server.
  *
- * There is no list-files-only or delete-one-file endpoint on the backend —
- * the same gap Secrets have (`VaultRepository.delete` crypto-shreds the whole
- * Vault, never a single Item). [list] reuses the generic Item list and
- * filters by kind; there is deliberately no `delete(id)` here to mirror.
+ * There is no list-files-only endpoint on the backend — [list] reuses the
+ * generic Item list and filters by kind.
  */
 interface FileRepository {
     suspend fun list(): List<FileSummary>
@@ -31,6 +29,9 @@ interface FileRepository {
 
     /** Downloads and decrypts a File's ciphertext. */
     suspend fun download(id: UUID): ByteArray
+
+    /** Soft-deletes this File and its blob (`DELETE /items/{id}`, shared with Secrets). */
+    suspend fun delete(id: UUID)
 }
 
 /**
@@ -83,5 +84,9 @@ class ApiFileRepository(
         } finally {
             file.dek.fill(0)
         }
+    }
+
+    override suspend fun delete(id: UUID) {
+        api.deleteItem(id)
     }
 }

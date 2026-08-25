@@ -214,6 +214,25 @@ class VaultScreenTest {
     }
 
     @Test
+    fun deleting_a_selected_file_calls_the_repository_and_removes_it_from_the_list() {
+        val repository = SealedFakeFileRepository()
+        val id = runBlocking { repository.upload("passport.pdf", "bytes".toByteArray()) }
+
+        compose.setContent { VaultScreen(SealedFakeRepository(), repository) }
+        compose.onNodeWithTag(TAG_TAB_FILES).performClick()
+        compose.waitForIdle()
+        assertTrue(runBlocking { repository.list() }.any { it.id == id })
+
+        compose.onNodeWithTag(TAG_FILES_SELECT_TOGGLE).performClick()
+        compose.onNodeWithTag("files-row-select-$id").performClick()
+        compose.onNodeWithTag(TAG_FILES_DELETE_SELECTED).performClick()
+        compose.waitForIdle()
+
+        assertFalse(runBlocking { repository.list() }.any { it.id == id })
+        compose.onNodeWithText("passport.pdf").assertDoesNotExist()
+    }
+
+    @Test
     fun capture_the_files_tab() {
         // Not an assertion — a rendering, so the new Files tab can be
         // reviewed as pixels rather than as a description.
@@ -283,6 +302,10 @@ private class SealedFakeRepository : VaultRepository {
     }
 
 
+    override suspend fun deleteItem(id: UUID) {
+        rows.remove(id)
+    }
+
     override suspend fun delete() {
         rows.clear()
     }
@@ -317,6 +340,10 @@ private class SealedFakeFileRepository : FileRepository {
             com.cryptum.crypto.SealedSecret(row.ciphertext, row.nonce, row.dek),
             row.dek,
         )
+    }
+
+    override suspend fun delete(id: UUID) {
+        rows.remove(id)
     }
 }
 

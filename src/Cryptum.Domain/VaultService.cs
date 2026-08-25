@@ -316,6 +316,44 @@ public sealed class VaultService(
     }
 
     /// <summary>
+    /// Deletes a single Item (Secret or File). Returns false if the caller does
+    /// not own it — the same answer a missing Item gives.
+    /// </summary>
+    /// <remarks>
+    /// This is not account deletion's crypto-shred: the account's KEK stays
+    /// alive, since it wraps every other Item's DEK too. What is destroyed is
+    /// only this Item's blob, if it has one — the row's soft-delete already
+    /// makes it unreadable through the API, and the blob is the one artifact
+    /// with no purge lifecycle otherwise watching it (unlike the row, which
+    /// <see cref="PurgeService"/> eventually hard-deletes).
+    /// </remarks>
+    public async Task<bool> DeleteItemAsync(UserId owner, ItemId id, CancellationToken cancellationToken = default)
+    {
+        var now = clock.GetUtcNow();
+        var item = await items.FindAsync(owner, id, cancellationToken).ConfigureAwait(false);
+
+        if (item is null)
+        {
+            await auditLog.RecordAsync(
+                AuditEntry.Record(owner, AuditAction.AccessDenied, now, id, succeeded: false),
+                cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        await items.SoftDeleteAsync(owner, id, now, cancellationToken).ConfigureAwait(false);
+
+        if (item.Kind == ItemKind.File && item.BlobPath is not null)
+        {
+            await blobStore.DeleteAsync(item.BlobPath, cancellationToken).ConfigureAwait(false);
+        }
+
+        await auditLog.RecordAsync(
+            AuditEntry.Record(owner, AuditAction.ItemDeleted, now, id), cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>
     /// Deletes the account: crypto-shred first, then soft-delete the rows (ADR-0003).
     /// </summary>
     /// <remarks>

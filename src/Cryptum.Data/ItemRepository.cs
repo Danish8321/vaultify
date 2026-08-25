@@ -71,6 +71,23 @@ public sealed class ItemRepository(CryptumDbContext db) : IItemRepository
             .ConfigureAwait(false);
     }
 
+    public async Task<bool> SoftDeleteAsync(
+        UserId owner, ItemId id, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        // History first, same ordering rationale as SoftDeleteAllAsync.
+        await db.ItemVersions
+            .Where(v => v.Owner == owner && v.ItemId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.DeletedAt, now), cancellationToken)
+            .ConfigureAwait(false);
+
+        var updated = await db.Items
+            .Where(i => i.Owner == owner && i.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.DeletedAt, now), cancellationToken)
+            .ConfigureAwait(false);
+
+        return updated > 0;
+    }
+
     public async Task AddVersionAsync(ItemVersion version, CancellationToken cancellationToken = default) =>
         await db.ItemVersions.AddAsync(version, cancellationToken).ConfigureAwait(false);
 

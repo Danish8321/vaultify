@@ -24,6 +24,11 @@ public sealed class BlobStore(BlobServiceClient serviceClient, string containerN
         await BuildSasUriAsync(blobPath, BlobSasLifetime.Download, BlobSasPermissions.Read, cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default) =>
+        await serviceClient.GetBlobContainerClient(containerName).GetBlobClient(blobPath)
+            .DeleteIfExistsAsync(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
     private async Task<Uri> BuildSasUriAsync(
         string blobPath, TimeSpan lifetime, BlobSasPermissions permissions, CancellationToken cancellationToken)
     {

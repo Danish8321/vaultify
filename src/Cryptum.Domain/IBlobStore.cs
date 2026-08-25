@@ -24,6 +24,14 @@ public interface IBlobStore
     /// permits a single read of exactly <paramref name="blobPath"/>.
     /// </summary>
     Task<Uri> GetDownloadSasUriAsync(string blobPath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes the blob at <paramref name="blobPath"/>, if it exists. A no-op,
+    /// not an error, when the blob is already gone — a registered File whose
+    /// upload never completed (see <see cref="VaultService.CreateFileAsync"/>'s
+    /// remarks) has no blob to delete, and its row must still be removable.
+    /// </summary>
+    Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default);
 }
 
 /// <summary>SAS lifetimes shared by every <see cref="IBlobStore"/> implementation.</summary>

@@ -45,6 +45,11 @@ public static class ItemEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 
+        group.MapDelete("/{id:guid}", DeleteAsync)
+            .WithName("DeleteItem")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/{id:guid}/versions", ListVersionsAsync)
             .WithName("ListItemVersions")
             .Produces<IReadOnlyList<ItemVersionSummaryResponse>>();
@@ -227,6 +232,22 @@ public static class ItemEndpoints
                 UpdatedAt = item.UpdatedAt,
             });
         }
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        VaultService vault,
+        CancellationToken cancellationToken)
+    {
+        if (!CallerIdentity.TryResolve(principal, out var owner))
+        {
+            return Results.Unauthorized();
+        }
+
+        var deleted = await vault.DeleteItemAsync(owner, new ItemId(id), cancellationToken).ConfigureAwait(false);
+
+        return deleted ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> UpdateSecretAsync(

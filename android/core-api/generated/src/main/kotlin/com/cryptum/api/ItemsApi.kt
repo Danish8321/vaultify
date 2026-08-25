@@ -119,6 +119,39 @@ import io.ktor.http.ParametersBuilder
             }
 
         /**
+        * DELETE /items/{id}
+        * 
+        * 
+         * @param id  
+         * @return void
+        */
+        open suspend fun deleteItem(id: com.cryptum.api.SerializableUuid): HttpResponse<Unit> {
+
+            val localVariableAuthNames = listOf<String>()
+
+            val localVariableBody = 
+                    io.ktor.client.utils.EmptyContent
+
+            val localVariableQuery = mutableMapOf<String, List<String>>()
+
+            val localVariableHeaders = mutableMapOf<String, String>()
+
+            val localVariableConfig = RequestConfig<kotlin.Any?>(
+            RequestMethod.DELETE,
+            "/items/{id}".replace("{" + "id" + "}", "$id"),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            )
+
+            return request(
+            localVariableConfig,
+            localVariableBody,
+            localVariableAuthNames
+            ).wrap()
+            }
+
+        /**
         * GET /items/{id}/versions
         * 
         * 

@@ -18,10 +18,18 @@ public sealed class FakeBlobStore : IBlobStore
 {
     private readonly ConcurrentDictionary<string, int> uploadSasIssued = new();
     private readonly ConcurrentDictionary<string, int> downloadSasIssued = new();
+    private readonly ConcurrentDictionary<string, bool> deleted = new();
 
     public int UploadSasCountFor(string blobPath) => uploadSasIssued.GetValueOrDefault(blobPath);
 
     public int DownloadSasCountFor(string blobPath) => downloadSasIssued.GetValueOrDefault(blobPath);
+
+    public bool WasDeleted(string blobPath) => deleted.ContainsKey(blobPath);
+
+    /// <summary>Paths an upload SAS was ever issued for — the only way a test can
+    /// learn the blob path <see cref="VaultService.CreateFileAsync"/> generated,
+    /// since it is not part of any response contract.</summary>
+    public IReadOnlyCollection<string> UploadedPaths => uploadSasIssued.Keys.ToList();
 
     public Task<Uri> GetUploadSasUriAsync(string blobPath, CancellationToken cancellationToken = default)
     {
@@ -33,6 +41,12 @@ public sealed class FakeBlobStore : IBlobStore
     {
         downloadSasIssued.AddOrUpdate(blobPath, 1, (_, count) => count + 1);
         return Task.FromResult(BuildUri(blobPath, "download", BlobSasLifetime.Download));
+    }
+
+    public Task DeleteAsync(string blobPath, CancellationToken cancellationToken = default)
+    {
+        deleted[blobPath] = true;
+        return Task.CompletedTask;
     }
 
     private static Uri BuildUri(string blobPath, string operation, TimeSpan lifetime) =>

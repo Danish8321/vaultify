@@ -31,6 +31,13 @@ public interface IItemRepository
     /// <summary>Soft-deletes every Item owned by the User, history included (ADR-0003).</summary>
     Task<int> SoftDeleteAllAsync(UserId owner, DateTimeOffset now, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Soft-deletes one Item and its history, if <paramref name="owner"/> owns
+    /// it. Returns false for an Item that does not exist or belongs to someone
+    /// else — same 404-not-403 shape as the rest of this interface.
+    /// </summary>
+    Task<bool> SoftDeleteAsync(UserId owner, ItemId id, DateTimeOffset now, CancellationToken cancellationToken = default);
+
     Task AddVersionAsync(ItemVersion version, CancellationToken cancellationToken = default);
 
     /// <summary>Returns the archived version only if <paramref name="owner"/> owns it; otherwise null.</summary>

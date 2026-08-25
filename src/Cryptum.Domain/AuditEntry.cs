@@ -15,6 +15,8 @@ public enum AuditAction
 
     /// <summary>A restore rewrites current content, so it is a write worth naming separately.</summary>
     ItemVersionRestored = 10,
+
+    ItemDeleted = 11,
 }
 
 /// <summary>

@@ -63,17 +63,22 @@ class MainActivity : FragmentActivity() {
             MaterialTheme(colorScheme = CryptumColorScheme) {
                 val lock = remember { AppLock() }
                 var locked by remember { mutableStateOf(true) }
-                // In-memory only — no settings-persistence layer exists yet (the
-                // same gap SettingsScreen already lives with), so onboarding
-                // replays every fresh process rather than only on a real first run.
-                var onboarded by remember { mutableStateOf(false) }
+                // Local-only (SharedPreferences, not a User row): onboarding is
+                // device UI state, not an account fact, and this needs no server
+                // round trip or schema change to be a real one-time flow. Reset on
+                // reinstall only — same tradeoff Settings' other local-only state
+                // already lives with.
+                var onboarded by remember { mutableStateOf(OnboardingPrefs.isOnboarded(this)) }
 
                 SideEffect { lock.onLockStateChanged { locked = it } }
 
                 ReLockOnBackground(lock)
 
                 if (!onboarded) {
-                    OnboardingScreen(onFinished = { onboarded = true })
+                    OnboardingScreen(onFinished = {
+                        OnboardingPrefs.setOnboarded(this)
+                        onboarded = true
+                    })
                 } else {
                     LockGate(
                         isLocked = locked,

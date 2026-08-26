@@ -3,6 +3,7 @@ package com.cryptum.app
 import android.view.WindowManager
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.test.platform.app.InstrumentationRegistry
 import com.cryptum.lock.TAG_SEAL
 import com.cryptum.lock.TAG_VAULT_CONTENT
 import org.junit.Rule
@@ -18,6 +19,15 @@ import kotlin.test.assertTrue
  * FLAG_SECURE is exactly that kind of claim.
  */
 class MainActivityTest {
+
+    init {
+        // These tests exercise the lock/vault flow, not first-run onboarding
+        // (ticket 29 covers that separately) — seed the already-onboarded
+        // state before the compose rule launches the Activity (its launch
+        // happens during rule application, ahead of any @Before), matching
+        // a returning user.
+        OnboardingPrefs.setOnboarded(InstrumentationRegistry.getInstrumentation().targetContext)
+    }
 
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()

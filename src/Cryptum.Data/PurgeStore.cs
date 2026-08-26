@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Cryptum.Data;
 
 /// <summary>
-/// Purges soft-deleted rows in committed batches.
+/// Purges soft-deleted rows, and File blobs, in committed batches.
 /// </summary>
 /// <remarks>
 /// Every query here uses <c>IgnoreQueryFilters</c>, because the global filter
@@ -12,7 +12,7 @@ namespace Cryptum.Data;
 /// the codebase where bypassing the filter is correct rather than suspicious,
 /// which is why it lives here and nowhere else.
 /// </remarks>
-public sealed class PurgeStore(CryptumDbContext db) : IPurgeStore
+public sealed class PurgeStore(CryptumDbContext db, IBlobStore blobStore) : IPurgeStore
 {
     public async Task<PurgeResult> PurgeBatchAsync(
         DateTimeOffset deletedBefore,
@@ -34,6 +34,25 @@ public sealed class PurgeStore(CryptumDbContext db) : IPurgeStore
         if (ids.Count == 0)
         {
             return new PurgeResult(0, 0);
+        }
+
+        // Blobs go before rows. If the process dies partway through this loop,
+        // the rows are still soft-deleted (not yet hard-deleted below), so the
+        // next run re-selects the same ids — and IBlobStore.DeleteAsync is a
+        // no-op for an already-gone blob, so re-running costs nothing. The
+        // reverse order would let a row disappear while its blob survives with
+        // nothing left that ever looks for it again — a permanent leak, not a
+        // recoverable interruption.
+        var blobPaths = await db.Items
+            .IgnoreQueryFilters()
+            .Where(i => ids.Contains(i.Id) && i.Kind == ItemKind.File && i.BlobPath != null)
+            .Select(i => i.BlobPath!)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var blobPath in blobPaths)
+        {
+            await blobStore.DeleteAsync(blobPath, cancellationToken).ConfigureAwait(false);
         }
 
         // History goes first. If the process dies between these two statements,

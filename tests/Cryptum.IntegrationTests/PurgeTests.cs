@@ -82,6 +82,18 @@ public sealed class PurgeTests(CryptumApiFactory factory) : IClassFixture<Cryptu
     }
 
     [Fact]
+    public async Task Purge_also_deletes_the_blob_behind_a_soft_deleted_File()
+    {
+        const string blobPath = "purge-test-owner/purge-test-file";
+        await SeedFileAsync(blobPath);
+
+        var purged = await PurgeAsync();
+
+        Assert.Equal(1, purged.Items);
+        Assert.True(factory.BlobStore.WasDeleted(blobPath));
+    }
+
+    [Fact]
     public async Task Purging_twice_deletes_nothing_the_second_time()
     {
         await SeedAsync(itemCount: 4, softDeleted: true);
@@ -144,5 +156,26 @@ public sealed class PurgeTests(CryptumApiFactory factory) : IClassFixture<Cryptu
 
         await db.SaveChangesAsync(CancellationToken.None);
         return owner;
+    }
+
+    private async Task SeedFileAsync(string blobPath)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CryptumDbContext>();
+
+        var owner = new UserId(Guid.NewGuid());
+        var item = Item.CreateFile(
+            owner,
+            "purge-test-file",
+            blobPath,
+            sizeBytes: 3,
+            new byte[12],
+            new WrappedDek([4, 5, 6], "v1"),
+            Now.AddDays(-30));
+
+        item.MarkDeleted(Now.AddDays(-1));
+
+        db.Items.Add(item);
+        await db.SaveChangesAsync(CancellationToken.None);
     }
 }

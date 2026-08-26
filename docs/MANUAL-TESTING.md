@@ -115,12 +115,14 @@ Attach `crash.log` to the ticket; a single clean rerun does not close it.
 
 ## 5. Android — manual app run
 
-**Limitation:** `Repositories.forSignedInUser()`
-(`android/app/src/main/kotlin/com/cryptum/app/Repositories.kt`) deliberately
-throws — there is no sign-in (ticket 14) and no deployed backend (ticket 06)
-to call. The app will show the lock screen and, once unlocked, **crash on
-purpose** entering the Vault screen. That crash is the honest state of the
-wiring, not a regression — don't file it as a new bug.
+**Limitation:** `Repositories.forSignedInUser()` and
+`Repositories.filesForSignedInUser()`
+(`android/app/src/main/kotlin/com/cryptum/app/Repositories.kt`) both
+deliberately throw — there is no sign-in (ticket 14) and no deployed
+backend (ticket 06) to call. The app will show onboarding, then the lock
+screen, and once unlocked, **crash on purpose** entering the Vault
+screen. That crash is the honest state of the wiring, not a regression —
+don't file it as a new bug.
 
 Steps:
 
@@ -130,7 +132,16 @@ Steps:
    ./gradlew :app:installDebug
    ```
 2. Launch **Cryptum** on the device/emulator.
-3. **Lock screen (`LockGate` / `SealTheme`)** — verify:
+3. **Onboarding (`Onboarding.kt`)** — first launch only, verify:
+   - Matrix-rain intro slides appear and are skippable.
+   - PIN setup and biometric enroll screens follow, reusing the same
+     `PinDots`/`PinPad`/circular hold-target used by the lock screen.
+   - Completing onboarding (or skipping) never reappears on subsequent
+     launches — persisted via `OnboardingPrefs` (`SharedPreferences`,
+     ticket 29). To force onboarding again without reinstalling:
+     `adb shell pm clear com.cryptum` (this also clears everything else
+     app-local, so treat it as a full reset).
+4. **Lock screen (`LockGate` / `SealTheme`)** — verify:
    - App opens locked; the sealed surface is visible with no secret content.
    - Tapping to unlock triggers the biometric prompt (`BiometricGate`).
      On an emulator without biometrics enrolled, use the emulator's
@@ -143,7 +154,7 @@ Steps:
    - Backgrounding the app while unlocked (`ReLockOnBackground`) and
      returning should show the lock screen again, not the last unlocked
      state.
-4. **Screenshot/recents check:** with the app in the foreground showing any
+5. **Screenshot/recents check:** with the app in the foreground showing any
    screen, open the Recents/App Switcher view. The Cryptum card should show
    a blank or system placeholder thumbnail, never live content —
    `FLAG_SECURE` is set for the whole window lifetime in `MainActivity`.

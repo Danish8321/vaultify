@@ -209,16 +209,51 @@ This is the slice that proves the architecture. Every task below crosses a tier 
 - **Files:** `src/Cryptum.Infrastructure/BlobStore.cs`, `ItemsController`
 - **Change:** File ciphertext to Blob Storage; metadata and wrapped DEK to SQL. Upload and download via short-lived user-delegation SAS.
 - **Verify:** Integration test round-trips a file. Confirm the blob is unreadable without the DEK, and that a SAS actually expires.
+- **As built:** `ItemEndpoints`, not a separate `ItemsController` — minimal APIs, same as
+  the rest of the Vault surface. `VaultService.CreateFileAsync`/`ReadFileAsync` mint the
+  SAS through `IBlobStore` (`Azure.Storage.Blobs`, a new dependency, asked and approved).
+  The blob path is `{owner:N}/{ItemId.New():N}` — a fresh random id, deliberately not
+  reused across a retried registration, so a retry cannot orphan or overwrite a prior
+  upload. The row is written before the client's upload happens: an accepted gap, since
+  confirming the blob first would mean proxying bytes through the server, the exact thing
+  this section avoids. Round-tripped by `FileEndpointTests`, against `FakeBlobStore` — a
+  real Storage account has never exercised this (ticket 06, ticket 31). Hit and fixed one
+  cross-cutting bug along the way: .NET's OpenAPI generator was emitting a `type:
+  [integer, string]` union for every required numeric property, not just this feature's
+  `sizeBytes` — openapi-generator's Kotlin client silently produced empty stub classes in
+  its place. Fixed with a schema transformer (`PlainIntegerSchemaTransformer`), not a
+  per-field workaround.
 
 ### 3.2 Size cap and per-user quota
 - **Files:** `src/Cryptum.Api/`, `src/Cryptum.Domain/`
 - **Change:** Per-file size cap and per-user total quota (security-requirements). Ciphertext cannot be content-inspected, so size and quota are the only meaningful upload controls — that makes them load-bearing rather than incidental.
 - **Verify:** Test — an oversized file is refused; a user at quota is refused; the partial upload leaves no orphaned blob.
+- **As built:** `FileLimits` (`IBlobStore.cs`) — 25 MiB per file, 250 MiB per account.
+  `VaultService.CreateFileAsync` checks both before writing the row, throwing
+  `FileQuotaExceededException` (mapped to 413). No `[Range]` attribute on the contract's
+  `SizeBytes` — that was the source of the OpenAPI union bug in 3.1's note, and the bound
+  was already redundantly enforced here, so the attribute was removed rather than
+  special-cased. "Partial upload leaves no orphaned blob" is not literally true: the row
+  can exist before the blob does (see 3.1); what holds is that a partial upload cannot
+  double-count toward quota, since `TotalFileBytesAsync` sums the registered size
+  regardless of whether the blob behind it ever arrived.
 
 ### 3.3 Android file attach and open
 - **Files:** `android/feature-vault/`
 - **Change:** Attach from the system picker, encrypt in chunks, upload with progress. Download, decrypt, open.
 - **Verify:** Instrumented round trip on a large file, confirming memory stays bounded rather than loading the whole file at once.
+- **As built:** `FileRepository`/`ApiFileRepository` (`FileRepository.kt`), mirroring
+  `VaultRepository`'s shape. Attach is SAF (`GetContent`/`OpenDocument`), not chunked —
+  the whole file is read into memory, sealed, and PUT in one call; chunked upload with a
+  progress UI was not built (below the 25 MiB cap this is not yet a problem the 3.1 quota
+  makes visible). Open now really opens: hold-to-open downloads, decrypts, writes to
+  `cacheDir/opened-files/`, and hands the file to an external viewer via `FileProvider`
+  and `ACTION_VIEW` (this was originally shipped as a stub that only flipped the row to
+  "opened" — closed as ticket 27). Delete did not exist on either Secrets or Files until
+  ticket 28 added `DELETE /items/{id}`, shared by both kinds. Verified by compile and
+  unit/instrumented-compile only — no emulator has run this on-device (ticket 30), and no
+  live backend has ever received a real upload (ticket 31), so the large-file
+  bounded-memory claim in **Verify** above is unconfirmed either way.
 
 ---
 
@@ -246,6 +281,14 @@ This is the slice that proves the architecture. Every task below crosses a tier 
   against real SQLite, including the plan's stated interrupt-and-resume case; mutation-checked by
   widening the batch, which fails that test. **Blob purge is not included** — there are no blobs
   until 3.1, which ticket 06 blocks. The worker's own timer loop is untested: ticket 21.
+  <br>Now that 3.1 exists, blob purge only ever needed to matter through this worker for the
+  account-deletion path (`SoftDeleteAllAsync` + a batch that outlives the request). A
+  single-Item delete (ticket 28) sidesteps it entirely — `VaultService.DeleteItemAsync`
+  deletes the blob immediately, synchronously, in the same call, since there is no
+  irreversible-in-bulk concern to defer there. `PurgeStore.PurgeBatchAsync` still only
+  hard-deletes rows; a File soft-deleted via account deletion still leaks its blob past
+  purge. Not fixed here — flag if account deletion of a Vault holding Files becomes a real
+  path before ticket 06/31 close.
 
 ### 4.3 Resolve the Key Vault retention question
 - **Files:** `docs/adr/0003-crypto-shred-deletion.md`

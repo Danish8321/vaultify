@@ -102,7 +102,12 @@ These are the tells of a generic build, and they are out:
   specific one fits the metaphor.
 - Lorem-ipsum-shaped empty states ("Nothing here yet!").
 - Any screen that exists because apps usually have it (onboarding carousel,
-  settings page full of toggles nobody asked for).
+  settings page full of toggles nobody asked for). **Note:** an onboarding
+  flow was later built (matrix-rain intro slides → PIN setup → biometric
+  enroll, `Onboarding.kt`) because the design-sync source prototype
+  specified one, not because "apps usually have it" — it reuses this
+  doc's own vocabulary (`Seal`, hold-to-reveal) rather than a stock
+  carousel, which is the distinction this rule is actually protecting.
 
 ## Non-negotiables inherited from security requirements
 
@@ -112,6 +117,14 @@ These are not stylistic and cannot be traded for aesthetics:
   recents-screen thumbnail (task 2.13).
 - The app lock gate (task 2.12) is unavoidable, on open and on resume.
 - Plaintext is never written to disk, including as a draft or a saved
-  scroll/state bundle.
+  scroll/state bundle. **Scoped exception:** opening a File externally
+  (ticket 27) necessarily puts decrypted bytes on disk — no Android
+  intent hands a byte array to another app, only a `content://` URI
+  backed by a real file. That file lives only in
+  `cacheDir/opened-files/`, never external storage, and only for the
+  duration needed to hand it to the viewer; the OS may clear the cache
+  at will, and a re-open just re-downloads and re-decrypts. This rule
+  otherwise held absolutely for Secrets (never needed disk at all) —
+  the exception is Files-only and this narrow.
 - The list shows titles in plaintext. This is a documented, accepted trade
   (security-requirements) — the UI must not imply titles are encrypted.

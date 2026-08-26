@@ -104,6 +104,14 @@ part of the same gate the CI `verify` job uses.
 Expect: green. `connectedAndroidTest` needs `adb devices` to show a target
 first — start an emulator or plug in a device before running it.
 
+**As built (2026-08-26):** run against a real connected device
+(`adb devices`, SM-E625F), `MainActivityTest.the_app_opens_sealed`
+failed for real — ticket 29's persisted onboarding meant a fresh test
+run lands on `OnboardingScreen`, never the lock screen the test
+expected. Fixed (ticket 33) by seeding already-onboarded state before
+the compose rule launches the Activity. `connectedAndroidTest` is
+green end to end on a real device, not just tested in principle.
+
 **If `connectedAndroidTest` fails intermittently:** this is tracked as
 ticket 20 — before touching test code, capture logcat:
 ```bash
@@ -123,6 +131,12 @@ backend (ticket 06) to call. The app will show onboarding, then the lock
 screen, and once unlocked, **crash on purpose** entering the Vault
 screen. That crash is the honest state of the wiring, not a regression —
 don't file it as a new bug.
+
+**As built (2026-08-26):** installed and walked onboarding + lock on a
+real device (SM-E625F, ticket 30) — matches the limitation above
+exactly, nothing new to report. Files feature (upload/download/delete/
+open-externally) still can't be exercised manually without a deployed
+backend (ticket 31); device availability alone doesn't unblock it.
 
 Steps:
 
